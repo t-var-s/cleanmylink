@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Local deployment and tooling state
+.netlify/
+.playwright/
+.playwright-cli/
+
+# Local AI assistant/project metadata
+.agents/
+.claude/
+skills-lock.json
+
+# Local project config
+netlify.toml

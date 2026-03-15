@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f0f0f">
+    <meta name="description" content="Offline utility to remove junk parameters from your copied URLs">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Clean my copied link">
+    <meta property="og:description" content="Offline utility to remove junk parameters from your copied URLs">
+    <meta property="og:image" content="/assets/social-share.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Clean my copied link app interface showing the URL cleaning action and recent links panel">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Clean my copied link">
+    <meta name="twitter:description" content="Offline utility to remove junk parameters from your copied URLs">
+    <meta name="twitter:image" content="/assets/social-share.png">
+    <meta name="twitter:image:alt" content="Clean my copied link app interface showing the URL cleaning action and recent links panel">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta name="referrer" content="no-referrer">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="clipboard.png" type="image/png" sizes="48x48">
+    <link rel="apple-touch-icon" href="assets/icon-192.png">
+    <link rel="stylesheet" href="styles.css">
+    <title>Clean my copied link</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <div class="app-column">
+        <section class="hero-stage">
+          <div class="app-panel app-panel-hero">
+            <div class="hero-copy">
+              <p class="eyebrow">Offline clipboard utility</p>
+              <h1 id="status-message" class="status-message" aria-live="polite">
+                Remove junk parameters from any URL you've just copied.
+              </h1>
+            </div>
+
+            <button id="clean-button" class="clean-button" type="button">
+              <span class="clean-button-label">Clean My Copied Link</span>
+              <span class="button-loading" aria-hidden="true">
+                <span class="button-spinner"></span>
+              </span>
+              <span class="button-spark button-spark-1" aria-hidden="true"></span>
+              <span class="button-spark button-spark-2" aria-hidden="true"></span>
+              <span class="button-spark button-spark-3" aria-hidden="true"></span>
+              <span class="button-spark button-spark-4" aria-hidden="true"></span>
+              <span class="button-spark button-spark-5" aria-hidden="true"></span>
+              <span class="button-spark button-spark-6" aria-hidden="true"></span>
+            </button>
+          </div>
+        </section>
+
+        <section class="app-panel history-section" aria-labelledby="history-heading">
+          <div class="history-header">
+            <div>
+              <p class="section-label">Stored locally</p>
+              <h2 id="history-heading">Recent links</h2>
+            </div>
+            <p id="history-summary" class="history-summary">Saved for 24 hours on this device.</p>
+          </div>
+          <div class="history-body">
+            <ul id="history-list" class="history-list"></ul>
+            <p id="history-empty" class="history-empty">No links cleaned yet.</p>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script src="transforms.js" defer></script>
+    <script src="app.js" defer></script>
+  </body>
+</html>

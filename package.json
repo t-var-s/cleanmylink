@@ -1,0 +1,13 @@
+{
+  "name": "clean-my-link",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "node -e \"console.log('Static site: no build step required.')\"",
+    "start": "python3 -m http.server 4173",
+    "serve": "python3 -m http.server 4173",
+    "test": "node --test",
+    "netlify:deploy": "npx netlify deploy",
+    "netlify:deploy:prod": "npx netlify deploy --prod"
+  }
+}
