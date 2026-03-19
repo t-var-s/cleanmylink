@@ -237,6 +237,26 @@ body {
   opacity: 0;
 }
 
+.hero-credit {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.83rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.hero-credit a {
+  color: inherit;
+  text-underline-offset: 0.14em;
+  text-decoration-color: rgba(159, 173, 192, 0.5);
+}
+
+.hero-credit a:hover,
+.hero-credit a:focus-visible {
+  color: var(--text);
+  text-decoration-color: currentColor;
+}
+
 .button-spark {
   position: absolute;
   top: 50%;
