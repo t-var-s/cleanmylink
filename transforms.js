@@ -14,6 +14,7 @@
     "mkt_tok",
     "oly_anon_id",
     "oly_enc_id",
+    "smid",
     "vero_id",
     "wickedid",
     "yclid"

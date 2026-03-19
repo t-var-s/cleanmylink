@@ -5,7 +5,7 @@ const transforms = require("../transforms.js");
 
 test("cleanUrl removes standard and known tracking parameters while preserving others", () => {
   const input = new URL(
-    "https://example.com/path?utm_source=newsletter&ref=abc&fbclid=123&gclid=456&keep=ok"
+    "https://example.com/path?utm_source=newsletter&ref=abc&fbclid=123&gclid=456&smid=789&keep=ok"
   );
 
   assert.equal(transforms.cleanUrl(input), "https://example.com/path?keep=ok");

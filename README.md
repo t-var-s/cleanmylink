@@ -8,7 +8,7 @@ If the clipboard contains an `http` or `https` link, the app removes common trac
 
 - Reads the current clipboard when you tap `Clean My Link`
 - Cleans whitespace-split URLs before parsing them
-- Removes common tracking parameters such as `utm_*`, `ref`, and `ref_*`
+- Removes common tracking parameters such as `utm_*`, `ref`, `ref_*`, and `smid`
 - Applies site-specific transforms
 - Writes the cleaned result back to the clipboard
 - Stores recent cleaned links in local storage for 24 hours
