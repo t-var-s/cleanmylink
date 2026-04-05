@@ -34,6 +34,17 @@
 
     {
       matches(url) {
+        return /(^|\.)reddit\.com$/.test(url.hostname);
+      },
+
+      apply(url) {
+        url.hostname = "redlib.freedit.eu";
+        return url;
+      }
+    },
+
+    {
+      matches(url) {
         return /(^|\.)youtube\.com$/.test(url.hostname) || /(^|\.)youtu\.be$/.test(url.hostname);
       },
 

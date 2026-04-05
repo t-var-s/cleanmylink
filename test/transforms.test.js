@@ -23,6 +23,15 @@ test("cleanUrl leaves x.com article links unchanged apart from tracking cleanup"
   assert.equal(transforms.cleanUrl(input), "https://x.com/i/article/123?keep=ok");
 });
 
+test("cleanUrl rewrites reddit.com links to redlib.freedit.eu", () => {
+  const input = new URL("https://www.reddit.com/r/node/comments/abc123/post?utm_source=share&keep=ok");
+
+  assert.equal(
+    transforms.cleanUrl(input),
+    "https://redlib.freedit.eu/r/node/comments/abc123/post?keep=ok"
+  );
+});
+
 test("cleanUrl keeps only the video id on YouTube watch URLs", () => {
   const input = new URL("https://www.youtube.com/watch?v=abc123&utm_source=newsletter&t=90");
 
