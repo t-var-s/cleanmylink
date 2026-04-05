@@ -64,6 +64,8 @@ Production deploy:
 npm run netlify:deploy:prod
 ```
 
+Before deploying a new version, bump `APP_VERSION` in [`sw.js`](/Users/agency/dev/codex/cleanmylink/sw.js) so installed PWAs detect the update and rotate caches.
+
 ## Git notes
 
 This repo is intended to ignore local-only assistant folders, Netlify local state, Playwright artifacts, macOS metadata, and the local `netlify.toml` file.

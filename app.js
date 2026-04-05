@@ -6,7 +6,8 @@ const app = {
     historyTtlMs: 24 * 60 * 60 * 1000,
     historyLimit: 20,
     desktopBreakpoint: 960,
-    defaultStatus: "Remove junk parameters from any URL you've just copied."
+    defaultStatus: "Remove junk parameters from any URL you've just copied.",
+    defaultButtonLabel: "Clean My Copied Link"
   },
 
   messages: {
@@ -15,12 +16,15 @@ const app = {
     empty: "No text was found in your clipboard.",
     unchanged: "All clear!",
     blocked: "Clipboard access is blocked. Try allowing clipboard permissions.",
-    error: "Something went sideways while cleaning your clipboard."
+    error: "Something went sideways while cleaning your clipboard.",
+    updateAvailable: "A new version for this app is available online.",
+    updateOffline: "Network went offline, can't update."
   },
 
   elements: {
     status: document.querySelector("#status-message"),
     button: document.querySelector("#clean-button"),
+    buttonLabel: document.querySelector(".clean-button-label"),
     buttonSparks: Array.from(document.querySelectorAll(".button-spark")),
     heroStage: document.querySelector(".hero-stage"),
     historySection: document.querySelector(".history-section"),
@@ -32,7 +36,10 @@ const app = {
   state: {
     layout: null,
     resizeFrame: 0,
-    viewportListenerBound: false
+    viewportListenerBound: false,
+    buttonMode: "clean",
+    pwaRegistration: null,
+    isReloadingForUpdate: false
   },
 
   transforms: sharedTransforms,
@@ -163,6 +170,10 @@ const app = {
       app.layout.scheduleApply();
     },
 
+    setButtonLabel(label) {
+      app.elements.buttonLabel.textContent = label;
+    },
+
     setButtonLoading(isLoading) {
       app.elements.button.classList.toggle("is-loading", isLoading);
       app.elements.button.disabled = isLoading;
@@ -182,6 +193,26 @@ const app = {
       app.ui.setButtonBurst();
       void app.elements.button.offsetWidth;
       app.elements.button.classList.add("is-bursting");
+    },
+
+    setPrimaryActionMode(mode) {
+      app.state.buttonMode = mode;
+
+      if (mode === "update") {
+        app.ui.setStatus("updateAvailable");
+        app.ui.setButtonLabel("Update Now");
+        return;
+      }
+
+      if (mode === "retry-update") {
+        app.ui.setStatus("updateOffline");
+        app.ui.setButtonLabel("Try again");
+        return;
+      }
+
+      app.elements.status.textContent = app.config.defaultStatus;
+      app.ui.setButtonLabel(app.config.defaultButtonLabel);
+      app.layout.scheduleApply();
     },
 
     setButtonBurst() {
@@ -293,13 +324,94 @@ const app = {
   },
 
   pwa: {
+    setUpdateMode() {
+      app.ui.setPrimaryActionMode(navigator.onLine ? "update" : "retry-update");
+    },
+
+    bindRegistration(registration) {
+      app.state.pwaRegistration = registration;
+
+      if (registration.waiting) {
+        app.pwa.setUpdateMode();
+      }
+
+      registration.addEventListener("updatefound", () => {
+        const installingWorker = registration.installing;
+        if (!installingWorker) {
+          return;
+        }
+
+        installingWorker.addEventListener("statechange", () => {
+          if (
+            installingWorker.state === "installed" &&
+            navigator.serviceWorker.controller
+          ) {
+            app.pwa.setUpdateMode();
+          }
+        });
+      });
+    },
+
+    async checkForUpdate() {
+      if (!app.state.pwaRegistration || !navigator.onLine) {
+        return;
+      }
+
+      try {
+        await app.state.pwaRegistration.update();
+      } catch (error) {
+        console.error("Service worker update check failed", error);
+      }
+    },
+
+    async activateUpdate() {
+      const registration = app.state.pwaRegistration;
+      if (!registration) {
+        return;
+      }
+
+      if (!navigator.onLine) {
+        app.ui.setPrimaryActionMode("retry-update");
+        return;
+      }
+
+      const waitingWorker = registration.waiting;
+      if (waitingWorker) {
+        app.state.isReloadingForUpdate = true;
+        app.ui.setButtonLoading(true);
+        waitingWorker.postMessage({ type: "SKIP_WAITING" });
+        return;
+      }
+
+      app.ui.setButtonLoading(true);
+
+      try {
+        await registration.update();
+
+        if (registration.waiting) {
+          app.state.isReloadingForUpdate = true;
+          registration.waiting.postMessage({ type: "SKIP_WAITING" });
+          return;
+        }
+      } catch (error) {
+        console.error("Service worker update activation failed", error);
+        app.ui.setPrimaryActionMode("retry-update");
+      } finally {
+        if (!app.state.isReloadingForUpdate) {
+          app.ui.setButtonLoading(false);
+        }
+      }
+    },
+
     async register() {
       if (!("serviceWorker" in navigator)) {
         return;
       }
 
       try {
-        await navigator.serviceWorker.register("sw.js");
+        const registration = await navigator.serviceWorker.register("sw.js");
+        app.pwa.bindRegistration(registration);
+        await app.pwa.checkForUpdate();
       } catch (error) {
         console.error("Service worker registration failed", error);
       }
@@ -311,6 +423,11 @@ const app = {
       app.layout.bind();
 
       app.elements.button.addEventListener("click", async () => {
+        if (app.state.buttonMode !== "clean") {
+          await app.pwa.activateUpdate();
+          return;
+        }
+
         let shouldBurst = false;
         app.ui.setStatus("loading");
         app.ui.setButtonLoading(true);
@@ -331,6 +448,38 @@ const app = {
           }
         }
       });
+
+      window.addEventListener("focus", () => {
+        app.pwa.checkForUpdate();
+      });
+
+      window.addEventListener("online", () => {
+        if (app.state.buttonMode !== "clean") {
+          app.pwa.setUpdateMode();
+        }
+
+        app.pwa.checkForUpdate();
+      });
+
+      window.addEventListener("offline", () => {
+        if (app.state.buttonMode !== "clean") {
+          app.ui.setPrimaryActionMode("retry-update");
+        }
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          app.pwa.checkForUpdate();
+        }
+      });
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (app.state.isReloadingForUpdate) {
+            window.location.reload();
+          }
+        });
+      }
     }
   },
 
