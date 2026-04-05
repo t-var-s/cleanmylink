@@ -1,12 +1,14 @@
-const CACHE_NAME = "clean-my-link-v3";
+const APP_VERSION = "2026.04.05.1";
+const CACHE_NAME = `clean-my-link-${APP_VERSION}`;
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./transforms.js",
   "./manifest.webmanifest",
   "./clipboard.png",
-  "./assets/social-share.png",
+  "./assets/cleanmycopiedlink.jpg",
   "./assets/icon-192.png",
   "./assets/icon-512.png"
 ];
@@ -25,8 +27,14 @@ self.addEventListener("activate", (event) => {
           .filter((key) => key !== CACHE_NAME)
           .map((key) => caches.delete(key))
       )
-    )
+    ).then(() => self.clients.claim())
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("fetch", (event) => {
