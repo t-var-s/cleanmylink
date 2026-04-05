@@ -1,4 +1,4 @@
-const APP_VERSION = "2026.04.05.1";
+const APP_VERSION = "2026.04.05.2";
 const CACHE_NAME = `clean-my-link-${APP_VERSION}`;
 const APP_SHELL = [
   "./",
@@ -8,6 +8,7 @@ const APP_SHELL = [
   "./transforms.js",
   "./manifest.webmanifest",
   "./clipboard.png",
+  "./assets/apple-touch-icon-180-v2.png",
   "./assets/cleanmycopiedlink.jpg",
   "./assets/icon-192.png",
   "./assets/icon-512.png"
