@@ -1,6 +1,6 @@
 {
-  "name": "Clean my copied link",
-  "short_name": "Clean my copied link",
+  "name": "Clean My link",
+  "short_name": "cleanmylink",
   "description": "Offline utility to remove junk parameters from your copied URLs",
   "start_url": "./",
   "display": "standalone",
