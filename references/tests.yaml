@@ -1,0 +1,179 @@
+version: 1
+verified_on: 2026-04-07
+
+automated:
+  - id: transforms-tracking-params
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - cleanUrl removes generic tracking parameters
+      - cleanUrl preserves unrelated query parameters
+
+  - id: transforms-x-rewrite
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - cleanUrl rewrites x.com status URLs to fxtwitter.com
+
+  - id: transforms-x-article-exception
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - x.com article URLs are not host-rewritten
+      - tracking cleanup still runs on article URLs
+
+  - id: transforms-reddit-rewrite
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - cleanUrl rewrites reddit.com URLs to redlib.freedit.eu
+
+  - id: transforms-youtube-v-only
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - cleanUrl keeps only the v parameter on YouTube watch URLs
+
+  - id: transforms-whitespace-split-url
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - cleanInput treats whitespace-split URLs as URLs
+      - cleanInput removes whitespace from URL candidates before parsing
+
+  - id: transforms-text-normalization
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - cleanText collapses repeated whitespace
+      - cleanText converts all-caps text to sentence case
+
+  - id: transforms-http-allowlist
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - parseUrl accepts http and https URLs
+      - parseUrl rejects non-http schemes
+
+manual_verified:
+  - id: browser-clean-url-success
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run start
+      - open http://127.0.0.1:4173
+      - grant clipboard-read and clipboard-write permissions for that origin
+    steps:
+      - write "https://example.com/path?utm_source=test&keep=1" to the clipboard
+      - click "Clean My Copied Link"
+    expected:
+      - status becomes "All clear!"
+      - clipboard becomes "https://example.com/path?keep=1"
+      - one history item is saved
+
+  - id: browser-empty-clipboard
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run start
+      - grant clipboard-read and clipboard-write permissions
+      - ensure local storage is empty
+      - write an empty string to the clipboard
+    steps:
+      - click "Clean My Copied Link"
+    expected:
+      - status becomes "No text was found in your clipboard."
+      - no history item is created
+
+  - id: browser-text-cleanup
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run start
+      - grant clipboard-read and clipboard-write permissions
+      - write "HELLO   WORLD.\nTHIS IS FINE." to the clipboard
+    steps:
+      - click "Clean My Copied Link"
+    expected:
+      - clipboard becomes "Hello world. This is fine."
+      - status becomes "All clear!"
+      - history remains unchanged because the result is not a URL
+
+  - id: browser-site-rules
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run start
+      - grant clipboard-read and clipboard-write permissions
+    steps:
+      - clean "https://x.com/someuser/status/42?utm_source=social"
+      - clean "https://www.youtube.com/watch?v=abc123&utm_source=newsletter&t=90"
+    expected:
+      - x.com result becomes "https://fxtwitter.com/someuser/status/42"
+      - YouTube result becomes "https://www.youtube.com/watch?v=abc123"
+      - both cleaned URLs appear in recent links
+
+  - id: browser-history-layout-ordering
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run start
+      - grant clipboard-read and clipboard-write permissions
+      - clean at least two distinct URLs
+    steps:
+      - view the app at a mobile viewport around 390x844
+      - view the app again at a desktop viewport wider than 960px
+    expected:
+      - mobile layout renders older cleaned links above newer ones and keeps the newest near the action panel
+      - desktop layout renders newest links first
+
+  - id: browser-safe-history-links
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run start
+      - grant clipboard-read and clipboard-write permissions
+      - create at least one history entry
+    steps:
+      - inspect a rendered history link
+    expected:
+      - target is "_blank"
+      - rel is "noopener noreferrer"
+
+  - id: browser-blocked-clipboard-state
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run start
+      - open the page without clipboard-read permission
+    steps:
+      - click "Clean My Copied Link"
+    expected:
+      - status becomes "Clipboard access is blocked. Try allowing clipboard permissions."
+
+  - id: browser-pwa-basics
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run start
+    steps:
+      - wait for the page to settle
+      - inspect service worker registrations
+      - fetch manifest.webmanifest from the app origin
+    expected:
+      - one active service worker is registered for http://127.0.0.1:4173/
+      - manifest.webmanifest responds with HTTP 200
+
+gaps:
+  - history TTL expiry is implemented but not covered by automation
+  - URL-history de-duplication is implemented but not covered by automation
+  - service worker update and retry-update button states are not covered by automation
+  - there is no automated DOM test suite for app.js yet
