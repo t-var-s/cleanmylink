@@ -418,6 +418,45 @@ const app = {
     }
   },
 
+  dev: {
+    isLocalhost() {
+      return (
+        location.hostname === "localhost" ||
+        location.hostname === "127.0.0.1" ||
+        location.hostname === "[::1]"
+      );
+    },
+
+    installHelpers() {
+      if (!app.dev.isLocalhost()) {
+        return;
+      }
+
+      window.resetAppCache = async ({ reload = true } = {}) => {
+        const registrations = "serviceWorker" in navigator
+          ? await navigator.serviceWorker.getRegistrations()
+          : [];
+        const cacheKeys = "caches" in window
+          ? await caches.keys()
+          : [];
+
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+        await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+
+        const summary = {
+          unregisteredServiceWorkers: registrations.length,
+          deletedCaches: cacheKeys.length
+        };
+
+        if (reload) {
+          window.location.reload();
+        }
+
+        return summary;
+      };
+    }
+  },
+
   events: {
     bind() {
       app.layout.bind();
@@ -489,6 +528,7 @@ const app = {
     }
 
     app.layout.apply();
+    app.dev.installHelpers();
     app.events.bind();
     app.pwa.register();
   }
