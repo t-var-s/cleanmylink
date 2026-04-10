@@ -137,15 +137,16 @@ body {
 
 .clean-button {
   position: relative;
-  isolation: isolate;
+  display: grid;
+  place-items: center;
   width: 100%;
+  min-height: 3.4rem;
   padding: 1rem 1.1rem;
-  border-bottom: 2px solid white;
+  border: 2px solid rgba(255, 255, 255, 0.82);
+  border-bottom-width: 4px;
+  border-bottom-color: rgba(8, 23, 35, 0.68);
   border-radius: 4px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08) 34%, transparent 70%),
-    linear-gradient(135deg, rgba(160, 220, 255, 0.22), transparent 58%),
-    var(--accent);
+  background: linear-gradient(180deg, #a9ddff 0%, #7cc7ff 54%, #57a9e1 100%);
   color: var(--accent-ink);
   font-family: var(--font-accent);
   font-size: 1.08rem;
@@ -154,98 +155,60 @@ body {
   letter-spacing: 0;
   text-transform: uppercase;
   cursor: pointer;
-  overflow: visible;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.16),
-    0 10px 22px rgba(0, 0, 0, 0.18);
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 10px 18px rgba(0, 0, 0, 0.18);
   transition:
     transform 140ms ease,
-    background-color 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
     box-shadow 140ms ease,
     opacity 140ms ease;
 }
 
-.clean-button::before,
-.clean-button::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-}
-
-.clean-button::before {
-  background: linear-gradient(120deg, transparent 20%, rgba(255, 255, 255, 0.34) 50%, transparent 80%);
-  opacity: 0;
-  transform: translateX(-40%);
-}
-
-.clean-button::after {
-  inset: -0.25rem;
-  border: 1px solid rgba(124, 199, 255, 0.26);
-  opacity: 0;
-  transform: scale(0.96);
-}
-
 .clean-button:active {
   transform: translateY(1px);
-  background: var(--accent-pressed);
+  border-bottom-color: rgba(8, 23, 35, 0.78);
+  background: linear-gradient(180deg, #9bd4fa 0%, #71bae8 54%, #4d98d0 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.12),
-    0 6px 14px rgba(0, 0, 0, 0.14);
-}
-
-.clean-button.is-bursting {
-  animation: button-pop 460ms cubic-bezier(0.2, 0.84, 0.24, 1);
-}
-
-.clean-button.is-bursting::before {
-  animation: button-sheen 420ms ease;
-}
-
-.clean-button.is-bursting::after {
-  animation: button-halo 460ms ease-out;
+    0 6px 12px rgba(0, 0, 0, 0.16);
 }
 
 .clean-button-label {
-  position: relative;
-  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  grid-area: 1 / 1;
   transition:
     transform 180ms ease,
     opacity 180ms ease;
 }
 
 .button-loading {
-  position: absolute;
-  inset: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  grid-area: 1 / 1;
   opacity: 0;
   pointer-events: none;
-  z-index: 1;
   transition: opacity 180ms ease;
 }
 
 .button-spinner {
-  width: 1.4rem;
-  height: 1.4rem;
-  border: 3px solid rgba(8, 23, 35, 0.22);
-  border-top-color: rgba(8, 23, 35, 0.9);
+  width: 1.2rem;
+  height: 1.2rem;
+  border: 3px solid rgba(8, 23, 35, 0.18);
+  border-top-color: rgba(8, 23, 35, 0.92);
+  border-right-color: rgba(8, 23, 35, 0.72);
   border-radius: 50%;
-  animation: button-spinner-rotate 700ms linear infinite;
+  animation: button-spinner-rotate 620ms linear infinite;
 }
 
 .clean-button.is-loading {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08) 34%, transparent 70%),
-    linear-gradient(135deg, rgba(160, 220, 255, 0.18), transparent 58%),
-    var(--accent-pressed);
+  background: linear-gradient(180deg, #98c7e8 0%, #73add5 54%, #548db4 100%);
+  border-color: rgba(255, 255, 255, 0.7);
+  border-bottom-color: rgba(8, 23, 35, 0.62);
 }
 
 .clean-button.is-loading .clean-button-label {
@@ -255,11 +218,6 @@ body {
 
 .clean-button.is-loading .button-loading {
   opacity: 1;
-}
-
-.clean-button.is-loading::before,
-.clean-button.is-loading::after {
-  opacity: 0;
 }
 
 .hero-credit {
@@ -282,27 +240,14 @@ body {
   text-decoration-color: currentColor;
 }
 
-.button-spark {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: var(--spark-size, 0.4rem);
-  height: var(--spark-size, 0.4rem);
-  margin: calc(var(--spark-size, 0.4rem) * -0.5);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 0 14px rgba(255, 255, 255, 0.42);
-  opacity: 0;
-  pointer-events: none;
-  transform: translate3d(0, 0, 0) scale(0.2);
+.clean-button:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px var(--focus),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 10px 18px rgba(0, 0, 0, 0.18);
 }
 
-.clean-button.is-bursting .button-spark {
-  animation: spark-fly 560ms cubic-bezier(0.18, 0.7, 0.24, 1) forwards;
-  animation-delay: var(--spark-delay, 0ms);
-}
-
-.clean-button:focus-visible,
 .history-link:focus-visible {
   outline: none;
   border-left: 2px solid var(--accent);
@@ -423,10 +368,10 @@ body {
 
 @media (hover: hover) {
   .clean-button:hover:not([disabled]) {
+    background: linear-gradient(180deg, #b4e1ff 0%, #86ceff 54%, #62b2e7 100%);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.22),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.16),
-      0 12px 24px rgba(0, 0, 0, 0.2);
+      inset 0 1px 0 rgba(255, 255, 255, 0.34),
+      0 12px 20px rgba(0, 0, 0, 0.2);
   }
 
   .history-link:hover {
@@ -436,68 +381,6 @@ body {
       linear-gradient(90deg, rgba(124, 199, 255, 0.12), transparent 24%),
       rgba(11, 18, 27, 0.76);
     box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
-  }
-}
-
-@keyframes button-pop {
-  0% {
-    transform: scale(1) rotate(0deg);
-  }
-
-  32% {
-    transform: scale(1.035) rotate(var(--button-tilt, 0deg));
-  }
-
-  58% {
-    transform: scale(0.985) rotate(calc(var(--button-tilt, 0deg) * -0.4));
-  }
-
-  100% {
-    transform: scale(1) rotate(0deg);
-  }
-}
-
-@keyframes button-sheen {
-  0% {
-    opacity: 0;
-    transform: translateX(-46%);
-  }
-
-  35% {
-    opacity: 0.85;
-  }
-
-  100% {
-    opacity: 0;
-    transform: translateX(42%);
-  }
-}
-
-@keyframes button-halo {
-  0% {
-    opacity: 0.65;
-    transform: scale(0.92);
-  }
-
-  100% {
-    opacity: 0;
-    transform: scale(1.08);
-  }
-}
-
-@keyframes spark-fly {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0) scale(0.2);
-  }
-
-  18% {
-    opacity: 1;
-  }
-
-  100% {
-    opacity: 0;
-    transform: translate3d(var(--spark-x, 0), var(--spark-y, 0), 0) scale(1);
   }
 }
 

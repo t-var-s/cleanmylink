@@ -25,7 +25,6 @@ const app = {
     status: document.querySelector("#status-message"),
     button: document.querySelector("#clean-button"),
     buttonLabel: document.querySelector(".clean-button-label"),
-    buttonSparks: Array.from(document.querySelectorAll(".button-spark")),
     heroStage: document.querySelector(".hero-stage"),
     historySection: document.querySelector(".history-section"),
     historyList: document.querySelector("#history-list"),
@@ -188,13 +187,6 @@ const app = {
       });
     },
 
-    burstButton() {
-      app.elements.button.classList.remove("is-bursting");
-      app.ui.setButtonBurst();
-      void app.elements.button.offsetWidth;
-      app.elements.button.classList.add("is-bursting");
-    },
-
     setPrimaryActionMode(mode) {
       app.state.buttonMode = mode;
 
@@ -213,24 +205,6 @@ const app = {
       app.elements.status.textContent = app.config.defaultStatus;
       app.ui.setButtonLabel(app.config.defaultButtonLabel);
       app.layout.scheduleApply();
-    },
-
-    setButtonBurst() {
-      const tilt = `${((Math.random() * 2) - 1) * 1.8}deg`;
-      app.elements.button.style.setProperty("--button-tilt", tilt);
-
-      app.elements.buttonSparks.forEach((spark, index) => {
-        const baseAngle = (Math.PI * 2 * index) / app.elements.buttonSparks.length;
-        const angle = baseAngle + (((Math.random() * 2) - 1) * 0.38);
-        const distance = 18 + Math.random() * 22;
-        const size = 4 + Math.random() * 5;
-        const delay = Math.floor(Math.random() * 90);
-
-        spark.style.setProperty("--spark-x", `${Math.cos(angle) * distance}px`);
-        spark.style.setProperty("--spark-y", `${Math.sin(angle) * distance}px`);
-        spark.style.setProperty("--spark-size", `${size}px`);
-        spark.style.setProperty("--spark-delay", `${delay}ms`);
-      });
     },
 
     getOrderedEntries(entries) {
@@ -467,24 +441,18 @@ const app = {
           return;
         }
 
-        let shouldBurst = false;
         app.ui.setStatus("loading");
         app.ui.setButtonLoading(true);
 
         try {
           await app.ui.waitForNextPaint();
-          const result = await app.clipboard.cleanLatest();
-          shouldBurst = Boolean(result?.hadClipboardText);
+          await app.clipboard.cleanLatest();
         } catch (error) {
           const statusKey = error?.name === "NotAllowedError" ? "blocked" : "error";
           app.ui.setStatus(statusKey);
           console.error(error);
         } finally {
           app.ui.setButtonLoading(false);
-
-          if (shouldBurst) {
-            app.ui.burstButton();
-          }
         }
       });
 
