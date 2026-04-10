@@ -101,6 +101,7 @@ body {
 .app-panel-hero {
   width: min(100%, 34rem);
   margin: 0 auto;
+  border-top: 2px solid white;
 }
 
 .hero-copy {
@@ -139,7 +140,7 @@ body {
   isolation: isolate;
   width: 100%;
   padding: 1rem 1.1rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom: 2px solid white;
   border-radius: 4px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08) 34%, transparent 70%),
@@ -304,6 +305,7 @@ body {
 .clean-button:focus-visible,
 .history-link:focus-visible {
   outline: none;
+  border-left: 2px solid var(--accent);
   box-shadow:
     0 0 0 3px var(--focus),
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
@@ -384,7 +386,8 @@ body {
   background:
     linear-gradient(90deg, rgba(124, 199, 255, 0.08), transparent 24%),
     rgba(11, 18, 27, 0.72);
-  border: 1px solid var(--line);
+  border: 2px solid var(--line);
+  border-left: 1px solid var(--accent);
   border-radius: 4px;
   transition:
     transform 140ms ease,
