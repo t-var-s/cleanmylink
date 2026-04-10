@@ -1,4 +1,4 @@
-const APP_VERSION = "2026.04.07.1";
+const APP_VERSION = "2026.04.10.1";
 const CACHE_NAME = `cleanmylink-${APP_VERSION}`;
 const APP_SHELL = [
   "./",
