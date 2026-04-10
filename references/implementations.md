@@ -64,6 +64,7 @@ Current site rules:
 - `ui`
 - `clipboard`
 - `pwa`
+- `dev`
 - `events`
 
 Important behavior in the current implementation:
@@ -103,6 +104,12 @@ Clipboard flow:
 - Writes the cleaned output with `navigator.clipboard.writeText(...)`
 - Shows blocked/error/empty/success status messages based on the outcome
 - Stores only URL results in history
+
+Localhost development helper:
+
+- On `localhost`, `127.0.0.1`, and `[::1]`, `app.dev.installHelpers()` exposes `window.resetAppCache(...)`.
+- `window.resetAppCache({ reload = true })` unregisters local service workers, clears Cache Storage, and optionally reloads the page.
+- The helper is intended for local iteration when the service worker's cache-first behavior would otherwise keep stale assets in the browser.
 
 ### `index.html`
 
@@ -194,6 +201,12 @@ Run tests:
 
 ```bash
 npm test
+```
+
+When a local browser session is stuck on stale cached assets, run this in the devtools console:
+
+```js
+await window.resetAppCache()
 ```
 
 Deploy preview:
