@@ -10,6 +10,10 @@
 dist/
 node_modules/
 
+# Local environment
+.env*
+!.env.example
+
 # Local AI assistant/project metadata
 .agents/
 .claude/
