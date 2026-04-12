@@ -38,41 +38,57 @@ const app = {
     viewportListenerBound: false,
     buttonMode: "clean",
     pwaRegistration: null,
-    isReloadingForUpdate: false
+    isReloadingForUpdate: false,
+    historyEntries: []
   },
 
   transforms: sharedTransforms,
 
+  storage: {
+    async readHistoryEntries() {
+      const entries = JSON.parse(localStorage.getItem(app.config.storageKey) || "[]");
+      return Array.isArray(entries) ? entries : [];
+    },
+
+    async writeHistoryEntries(entries) {
+      localStorage.setItem(app.config.storageKey, JSON.stringify(entries));
+    }
+  },
+
   history: {
-    read() {
+    async load() {
       try {
-        const rawEntries = JSON.parse(localStorage.getItem(app.config.storageKey) || "[]");
+        const rawEntries = await app.storage.readHistoryEntries();
         const freshEntries = rawEntries.filter((entry) => app.history.isValidEntry(entry));
 
         if (freshEntries.length !== rawEntries.length) {
-          localStorage.setItem(app.config.storageKey, JSON.stringify(freshEntries));
+          await app.storage.writeHistoryEntries(freshEntries);
         }
 
-        return freshEntries.sort((left, right) => right.timestamp - left.timestamp);
-      } catch {
-        return [];
+        app.state.historyEntries = freshEntries.sort((left, right) => right.timestamp - left.timestamp);
+      } catch (error) {
+        console.error("History storage read failed", error);
+        app.state.historyEntries = [];
       }
     },
 
-    save(url) {
+    async save(url) {
       if (!app.transforms.isSafeHttpUrl(url)) {
         return;
       }
 
-      const entries = app.history.read().filter((entry) => entry.url !== url);
+      const entries = app.state.historyEntries.filter((entry) => entry.url !== url);
       entries.unshift({
         url,
         timestamp: Date.now()
       });
-      localStorage.setItem(
-        app.config.storageKey,
-        JSON.stringify(entries.slice(0, app.config.historyLimit))
-      );
+      app.state.historyEntries = entries.slice(0, app.config.historyLimit);
+
+      try {
+        await app.storage.writeHistoryEntries(app.state.historyEntries);
+      } catch (error) {
+        console.error("History storage write failed", error);
+      }
     },
 
     isValidEntry(entry) {
@@ -212,7 +228,7 @@ const app = {
     },
 
     renderHistory() {
-      const entries = app.history.read();
+      const entries = app.state.historyEntries;
       const orderedEntries = app.ui.getOrderedEntries(entries);
 
       app.elements.historyList.innerHTML = "";
@@ -286,7 +302,7 @@ const app = {
       app.ui.setStatus(result.changed ? "success" : "unchanged");
 
       if (result.isUrl) {
-        app.history.save(result.output);
+        await app.history.save(result.output);
         app.ui.renderHistory();
       }
 
@@ -490,16 +506,20 @@ const app = {
     }
   },
 
-  init() {
+  async init() {
     if (!app.transforms) {
       throw new Error("Clean My Link transforms failed to load.");
     }
 
+    await app.history.load();
     app.layout.apply();
     app.dev.installHelpers();
     app.events.bind();
-    app.pwa.register();
+    await app.pwa.register();
   }
 };
 
-app.init();
+app.init().catch((error) => {
+  app.ui.setStatus("error");
+  console.error(error);
+});

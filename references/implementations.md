@@ -59,6 +59,7 @@ Current site rules:
 - `messages`
 - `elements`
 - `state`
+- `storage`
 - `history`
 - `layout`
 - `ui`
@@ -78,7 +79,11 @@ Important behavior in the current implementation:
 
 History handling:
 
-- Reads are wrapped in `try/catch` so malformed local storage does not break the app.
+- Storage access goes through async `storage.readHistoryEntries()` and `storage.writeHistoryEntries()` methods.
+- The storage adapter is currently backed by `localStorage`, leaving room for IndexedDB or encrypted storage later.
+- History entries are loaded into `state.historyEntries` during app startup.
+- Rendering reads from in-memory state instead of reading storage directly.
+- History loading is wrapped in `try/catch` so malformed local storage does not break the app.
 - Persisted entries are re-validated before use.
 - Invalid entries are removed when encountered.
 - Entries are stored newest first.
