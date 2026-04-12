@@ -1,4 +1,4 @@
-const APP_VERSION = "2026.04.10.1";
+const APP_VERSION = "2026.04.12.2";
 const CACHE_NAME = `cleanmylink-${APP_VERSION}`;
 const APP_SHELL = [
   "./",
@@ -7,11 +7,11 @@ const APP_SHELL = [
   "./app.js",
   "./transforms.js",
   "./manifest.webmanifest",
-  "./clipboard-v2.png",
-  "./assets/apple-touch-icon-180-v3.png",
-  "./assets/cleanmylink.jpg",
-  "./assets/icon-192-v2.png",
-  "./assets/icon-512-v2.png"
+  "./assets/favicon-48-v4.png",
+  "./assets/apple-touch-icon-180-v4.png",
+  "./assets/cleanmylink_v4.jpg",
+  "./assets/icon-192-v4.png",
+  "./assets/icon-512-v4.png"
 ];
 
 self.addEventListener("install", (event) => {

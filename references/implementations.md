@@ -19,7 +19,7 @@ Verified on April 7, 2026:
 - [`manifest.webmanifest`](manifest.webmanifest): install metadata and app icons
 - [`test/transforms.test.js`](test/transforms.test.js): Node test suite for transform behavior
 - [`assets/`](assets): install icons and social preview image
-- [`clipboard-v2.png`](clipboard-v2.png): favicon
+- [`assets/favicon-48-v4.png`](assets/favicon-48-v4.png): favicon
 
 ## Runtime implementation details
 
