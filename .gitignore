@@ -15,3 +15,6 @@ skills-lock.json
 
 # Local project config
 netlify.toml
+
+#editors
+*.swp
