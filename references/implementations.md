@@ -9,19 +9,19 @@ Verified on April 12, 2026:
 - `dist/` excludes source-only directories such as `references/`, `test/`, `scripts/`, and `src/`
 - the app runs locally from the Vite dev server and Vite preview server
 - the main clipboard flow works in-browser when clipboard permissions are granted
-- the blocked-permission path, empty-clipboard path, text-cleaning path, URL-cleaning path, history rendering, service worker registration, and manifest availability were all checked in a local browser session
+- the blocked-permission path, empty-clipboard path, text-cleaning path, URL-cleaning path, history rendering, startup storage loading states, service worker registration, and manifest availability were all checked in a local browser session
 
 ## File map
 
-- [`../index.html`](../index.html): main Vite HTML entry, metadata, CSP, manifest link, settings navigation, hero panel, button, history section, and module script loading
-- [`../settings.html`](../settings.html): settings Vite HTML entry for domain-transform toggles and save navigation
+- [`../index.html`](../index.html): main Vite HTML entry, metadata, CSP, manifest link, settings navigation, hero panel, button, history section, initial saved-links loading copy, and module script loading
+- [`../settings.html`](../settings.html): settings Vite HTML entry for domain-transform toggles, initial settings loading row, disabled-until-ready save navigation, and module script loading
 - [`../src/styles.css`](../src/styles.css): mobile-first layout, button, history, settings, view-transition, responsive desktop breakpoint at `960px`, and reduced-motion handling
 - [`../src/transforms.js`](../src/transforms.js): ESM transform registry and shared cleanup logic for URLs and plain text
-- [`../src/app.js`](../src/app.js): app factory and controller for clipboard access, history persistence, responsive layout, button states, and service worker update handling
+- [`../src/app.js`](../src/app.js): app factory and controller for clipboard access, history persistence, startup history loading state, responsive layout, button states, and service worker update handling
 - [`../src/main.js`](../src/main.js): browser bootstrap entry that starts the app
 - [`../src/storage.js`](../src/storage.js): async storage adapter used by app and settings controllers
 - [`../src/settings-storage.js`](../src/settings-storage.js): settings normalization, defaulting, serialization, and enabled-transform composition helpers
-- [`../src/settings.js`](../src/settings.js): settings page factory and controller for rendering domain toggles and saving staged changes
+- [`../src/settings.js`](../src/settings.js): settings page factory and controller for loading domain settings, rendering domain toggles, saving staged changes, and handling settings storage read/write failures
 - [`../src/settings-main.js`](../src/settings-main.js): browser bootstrap entry that starts the settings page
 - [`../src/sw-template.js`](../src/sw-template.js): service worker template with build-time placeholders for app version and precached app-shell paths
 - [`../public/manifest.webmanifest`](../public/manifest.webmanifest): install metadata and app icons, copied to `dist/` by Vite
@@ -111,6 +111,8 @@ History handling:
 - History entries are loaded into `state.historyEntries` during app startup.
 - Rendering reads from in-memory state instead of reading storage directly.
 - History loading is wrapped in `try/catch` so malformed local storage does not break the app.
+- Startup sets the history empty slot to `Loading saved links from this device...` with `aria-busy="true"` while the async history read is pending.
+- The history loading state is cleared and the history panel is rendered as soon as `readHistoryEntries()` settles, before transform settings and service-worker update checks continue.
 - Persisted entries are re-validated before use.
 - Invalid entries are removed when encountered.
 - Entries are stored newest first.
@@ -135,6 +137,7 @@ Clipboard flow:
 - Reads via `navigator.clipboard.readText()`
 - Writes the cleaned output with `navigator.clipboard.writeText(...)`
 - Reads domain-transform settings during app startup through `storage.readDomainTransformSettings()`, composes them with default transforms, and keeps the resulting enabled-transform map in memory for clipboard cleaning.
+- If domain-transform settings cannot be read during main-page startup, the app falls back to default transform settings and logs the storage error.
 - Shows blocked/error/empty/success status messages based on the outcome
 - Stores only URL results in history
 
@@ -149,6 +152,9 @@ The settings page only exposes site-specific URL transforms:
 Settings behavior:
 
 - Global tracking-parameter cleanup and plain-text cleanup are not exposed in settings and continue to apply by default.
+- The initial HTML includes a settings loading row so the page does not look empty while `readDomainTransformSettings()` is pending.
+- The settings form starts with `aria-busy="true"` and the save button disabled; `settings.js` clears both once saved settings are loaded or defaulted.
+- If settings cannot be read, the page falls back to default-enabled domain rules, renders the toggles, and reports `Settings could not be loaded. Defaults are shown.`
 - Settings are staged in memory while the user changes toggles.
 - The save action uses a square icon button with `/assets/icon_save.webp` and adjacent text.
 - The save label starts as `Confirm and go back to cleaning`.
@@ -195,8 +201,10 @@ The CSS matches the current product direction:
 - restrained card styling rather than marketing-heavy chrome
 - fixed bottom action area on mobile
 - two-column product layout on desktop
+- startup loading styles for storage-backed history and settings content
 - settings page styles for the domain-toggle form
-- cross-document View Transitions API opt-in with normal navigation fallback
+- cross-document View Transitions API opt-in with a restrained root fade and normal navigation fallback
+- no JavaScript calls `document.startViewTransition()`; page-to-page animation is browser-managed through `@view-transition { navigation: auto; }`
 - hover refinements only inside `@media (hover: hover)`
 - global reduced-motion fallback
 - local fonts are referenced from `src/assets/`, so Vite fingerprints them into `dist/assets/`
@@ -258,13 +266,13 @@ Current automated coverage:
 
 - transform behavior in [`../test/transforms.test.js`](../test/transforms.test.js)
 - settings storage and domain-only settings behavior in [`../test/storage.test.js`](../test/storage.test.js)
-- settings page controller behavior in [`../test/settings.test.js`](../test/settings.test.js)
-- import-safety coverage for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
+- settings page controller behavior, including settings-read fallback and loading-state clearing, in [`../test/settings.test.js`](../test/settings.test.js)
+- import-safety coverage and startup history-loading behavior for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
 - build output and generated service worker checks in [`../test/build.test.js`](../test/build.test.js)
 
 Current gaps:
 
-- no automated tests yet for `app.js` DOM behavior
+- no broad automated coverage yet for `app.js` DOM behavior beyond startup history loading
 - no automated browser test for clipboard permission states
 - no automated test for history expiry, de-duplication, or desktop/mobile ordering
 - no automated test for service worker update mode transitions
