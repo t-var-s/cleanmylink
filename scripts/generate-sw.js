@@ -1,12 +1,14 @@
-const fs = require("node:fs");
-const path = require("node:path");
-const { execSync } = require("node:child_process");
+import fs from "node:fs";
+import path from "node:path";
+import { execSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 const distDir = path.join(rootDir, "dist");
 const templatePath = path.join(rootDir, "src", "sw-template.js");
 const outputPath = path.join(distDir, "sw.js");
-const packageJson = require("../package.json");
+const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, "package.json"), "utf8"));
 
 function sanitizeVersionSegment(value) {
   return String(value || "")

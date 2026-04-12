@@ -15,8 +15,9 @@ Verified on April 12, 2026:
 
 - [`../index.html`](../index.html): Vite HTML entry, metadata, CSP, manifest link, hero panel, button, history section, and module script loading
 - [`../src/styles.css`](../src/styles.css): mobile-first layout, button and history styling, responsive desktop breakpoint at `960px`, and reduced-motion handling
-- [`../src/transforms.js`](../src/transforms.js): shared cleanup logic for URLs and plain text; exposed on `globalThis` for the browser and `module.exports` for tests
-- [`../src/app.js`](../src/app.js): application controller for clipboard access, history persistence, responsive layout, button states, and service worker update handling
+- [`../src/transforms.js`](../src/transforms.js): ESM transform registry and shared cleanup logic for URLs and plain text
+- [`../src/app.js`](../src/app.js): app factory and controller for clipboard access, history persistence, responsive layout, button states, and service worker update handling
+- [`../src/main.js`](../src/main.js): browser bootstrap entry that starts the app
 - [`../src/sw-template.js`](../src/sw-template.js): service worker template with build-time placeholders for app version and precached app-shell paths
 - [`../public/manifest.webmanifest`](../public/manifest.webmanifest): install metadata and app icons, copied to `dist/` by Vite
 - [`../public/assets/`](../public/assets): stable-path install icons, social preview image, and other public assets copied to `dist/assets/`
@@ -25,13 +26,14 @@ Verified on April 12, 2026:
 - [`../vite.config.mjs`](../vite.config.mjs): Vite config with explicit `dist` output
 - [`../netlify.toml`](../netlify.toml): Netlify build command, publish directory, and cache/security headers
 - [`../test/transforms.test.js`](../test/transforms.test.js): Node test suite for transform behavior
+- [`../test/app.test.js`](../test/app.test.js): Node test suite for app module import safety
 - [`../test/build.test.js`](../test/build.test.js): Node test suite for build output and generated service worker behavior
 
 ## Runtime implementation details
 
 ### `src/transforms.js`
 
-The transform layer is an IIFE that publishes a single shared object. That object currently exposes:
+The transform layer is an ESM module. It exports:
 
 - `parseUrl`
 - `isSafeHttpUrl`
@@ -41,25 +43,37 @@ The transform layer is an IIFE that publishes a single shared object. That objec
 - `cleanInput`
 - `isAllCaps`
 - `toSentenceCase`
+- `transformDefinitions`
+- `urlTransforms`
+- `textTransforms`
 - `siteRules`
+- `defaultEnabledTransforms`
+- `isTransformEnabled`
 
 Implementation choices:
 
 - URL validation is based on `new URL(...)` plus an explicit `http:` or `https:` allowlist.
 - URL cleaning always clones the input URL before mutation.
 - Tracking-parameter stripping is case-insensitive.
-- Site rules are defined as `{ matches, apply }` objects inside a `siteRules` array, so the rule list is already extensible.
+- Transforms are defined with stable `id`, `label`, `type`, `category`, `defaultEnabled`, and `apply` metadata so a settings UI can persist user choices without depending on array order.
+- `apply(...)` receives a context object with the active `enabledTransforms` map, so later transforms can inspect settings without changing the registry contract.
+- `cleanUrl`, `cleanText`, and `cleanInput` accept an optional `enabledTransforms` map. Missing keys fall back to each transform's `defaultEnabled` value.
 - Plain-text cleaning converts all-caps text to sentence case only when there are at least two letters.
 
-Current site rules:
+Current default-enabled transforms:
 
+- tracking-parameter cleanup
 - `x.com` -> `fxtwitter.com` except article paths
 - `reddit.com` -> `redlib.freedit.eu`
 - `youtube.com` / `youtu.be` -> clear search params, then keep only `v` if present
+- whitespace cleanup for plain text
+- sentence-case conversion for all-caps plain text
 
 ### `src/app.js`
 
-`app.js` is organized as a single `app` object with grouped concerns:
+`app.js` exports `createApp(...)` and `bootApp(...)`. `createApp(...)` accepts browser dependency overrides for test doubles, and `bootApp(...)` initializes the app returned by the factory. `src/main.js` is the browser entry that calls `bootApp()`.
+
+The app object is organized with grouped concerns:
 
 - `config`
 - `messages`
@@ -131,7 +145,7 @@ Security and metadata already live in the document shell:
 - `referrer` policy set to `no-referrer`
 - Open Graph and Twitter card metadata
 - manifest and icon links
-- Vite module entry: `/src/app.js`
+- Vite module entry: `/src/main.js`
 
 The body contains only two user-facing sections:
 
@@ -206,6 +220,7 @@ Current security-relevant measures in the codebase:
 Current automated coverage:
 
 - transform behavior in [`../test/transforms.test.js`](../test/transforms.test.js)
+- import-safety coverage for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
 - build output and generated service worker checks in [`../test/build.test.js`](../test/build.test.js)
 
 Current gaps:

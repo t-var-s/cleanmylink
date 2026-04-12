@@ -10,12 +10,34 @@ automated:
       - cleanUrl removes generic tracking parameters
       - cleanUrl preserves unrelated query parameters
 
+  - id: transforms-settings-metadata
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - transform definitions expose stable ids
+      - transform definitions expose labels, types, and default enabled state for settings UI
+
+  - id: transforms-disabled-tracking-params
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - cleanUrl can leave tracking parameters in place when the transform is disabled
+
   - id: transforms-x-rewrite
     type: unit
     file: test/transforms.test.js
     command: npm test
     covers:
       - cleanUrl rewrites x.com status URLs to fxtwitter.com
+
+  - id: transforms-disabled-x-rewrite
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - cleanUrl can leave x.com status URLs unchanged when the transform is disabled
 
   - id: transforms-x-article-exception
     type: unit
@@ -55,6 +77,13 @@ automated:
       - cleanText collapses repeated whitespace
       - cleanText converts all-caps text to sentence case
 
+  - id: transforms-disabled-text-case
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - cleanText can leave all-caps text unchanged when the sentence-case transform is disabled
+
   - id: transforms-http-allowlist
     type: unit
     file: test/transforms.test.js
@@ -62,6 +91,14 @@ automated:
     covers:
       - parseUrl accepts http and https URLs
       - parseUrl rejects non-http schemes
+
+  - id: app-import-without-dom-side-effects
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - app module can be imported in Node without querying browser DOM globals
+      - app bootstrapping is separated from app factory exports
 
   - id: build-output-excludes-source-only-directories
     type: build

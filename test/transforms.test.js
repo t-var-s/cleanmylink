@@ -1,7 +1,27 @@
-const test = require("node:test");
-const assert = require("node:assert/strict");
+import test from "node:test";
+import assert from "node:assert/strict";
 
-const transforms = require("../src/transforms.js");
+import * as transforms from "../src/transforms.js";
+
+test("transform definitions expose stable settings metadata", () => {
+  assert.deepEqual(
+    transforms.transformDefinitions.map(({ id }) => id),
+    [
+      "strip-tracking-params",
+      "rewrite-x-to-fxtwitter",
+      "rewrite-reddit-to-redlib",
+      "keep-youtube-video-id",
+      "normalize-text-whitespace",
+      "sentence-case-all-caps"
+    ]
+  );
+
+  for (const definition of transforms.transformDefinitions) {
+    assert.equal(typeof definition.label, "string");
+    assert.equal(typeof definition.defaultEnabled, "boolean");
+    assert.ok(["url", "text"].includes(definition.type));
+  }
+});
 
 test("cleanUrl removes standard and known tracking parameters while preserving others", () => {
   const input = new URL(
@@ -11,10 +31,36 @@ test("cleanUrl removes standard and known tracking parameters while preserving o
   assert.equal(transforms.cleanUrl(input), "https://example.com/path?keep=ok");
 });
 
+test("cleanUrl can leave tracking parameters enabled by settings", () => {
+  const input = new URL("https://example.com/path?utm_source=newsletter&keep=ok");
+
+  assert.equal(
+    transforms.cleanUrl(input, {
+      enabledTransforms: {
+        "strip-tracking-params": false
+      }
+    }),
+    "https://example.com/path?utm_source=newsletter&keep=ok"
+  );
+});
+
 test("cleanUrl rewrites x.com links to fxtwitter.com when the path is not an article", () => {
   const input = new URL("https://x.com/someuser/status/42?utm_source=social");
 
   assert.equal(transforms.cleanUrl(input), "https://fxtwitter.com/someuser/status/42");
+});
+
+test("cleanUrl can leave the x.com rewrite disabled by settings", () => {
+  const input = new URL("https://x.com/someuser/status/42?utm_source=social");
+
+  assert.equal(
+    transforms.cleanUrl(input, {
+      enabledTransforms: {
+        "rewrite-x-to-fxtwitter": false
+      }
+    }),
+    "https://x.com/someuser/status/42"
+  );
 });
 
 test("cleanUrl leaves x.com article links unchanged apart from tracking cleanup", () => {
@@ -52,6 +98,17 @@ test("cleanText collapses whitespace and converts all-caps text to sentence case
   assert.equal(
     transforms.cleanText("HELLO   WORLD.\nTHIS IS FINE."),
     "Hello world. This is fine."
+  );
+});
+
+test("cleanText can disable text transforms independently", () => {
+  assert.equal(
+    transforms.cleanText("HELLO   WORLD.\nTHIS IS FINE.", {
+      enabledTransforms: {
+        "sentence-case-all-caps": false
+      }
+    }),
+    "HELLO WORLD. THIS IS FINE."
   );
 });
 

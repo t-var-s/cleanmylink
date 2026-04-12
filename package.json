@@ -1,6 +1,7 @@
 {
   "name": "cleanmylink",
   "private": true,
+  "type": "module",
   "version": "0.1.0",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
@@ -8,7 +9,7 @@
     "start": "vite --host 127.0.0.1 --port 5173",
     "serve": "vite preview --host 127.0.0.1 --port 4173",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
-    "test:unit": "node --test test/transforms.test.js",
+    "test:unit": "node --test test/transforms.test.js test/app.test.js",
     "test:build": "node --test test/build.test.js",
     "test": "npm run test:unit && npm run build && npm run test:build",
     "netlify:deploy": "npm run build && npx netlify deploy --dir=dist",
