@@ -28,21 +28,23 @@
   </head>
   <body class="settings-page">
     <main class="settings-shell">
-      <form id="settings-form" class="settings-panel" autocomplete="off">
+      <form id="settings-form" class="settings-panel" autocomplete="off" aria-busy="true">
         <div class="settings-header">
-          <h1>Domain transforms</h1>
-          <p>Choose which domain fixes stay on.</p>
+          <h1>Settings</h1>
+          <h2>Domain transformations</h2>
         </div>
 
-        <ul id="settings-list" class="settings-list" aria-label="Domain transformations"></ul>
+        <ul id="settings-list" class="settings-list" aria-label="Domain transformations">
+          <li class="settings-loading">Loading settings from this device...</li>
+        </ul>
 
         <p id="settings-status" class="settings-status" aria-live="polite"></p>
 
         <div class="settings-save-row">
-          <button class="settings-save-button" type="submit" aria-labelledby="settings-save-label">
+          <span id="settings-save-label">Confirm and go back to cleaning</span>
+          <button class="settings-save-button" type="submit" aria-labelledby="settings-save-label" disabled>
             <img src="/assets/icon_save.webp" alt="" width="318" height="318">
           </button>
-          <span id="settings-save-label">Confirm and go back to cleaning</span>
         </div>
       </form>
     </main>

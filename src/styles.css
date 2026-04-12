@@ -74,11 +74,11 @@ body {
 .settings-save-button {
   display: grid;
   place-items: center;
-  width: 2.8rem;
-  height: 2.8rem;
-  border: 1px solid var(--line);
+  width: 4.35rem;
+  height: 4.35rem;
+  border: 0;
   border-radius: 4px;
-  background: var(--surface-strong);
+  background: transparent;
   color: var(--text);
 }
 
@@ -96,11 +96,17 @@ body {
   cursor: pointer;
 }
 
+.settings-save-button:disabled {
+  cursor: progress;
+  opacity: 0.55;
+}
+
 .settings-link img,
 .settings-save-button img {
   display: block;
-  width: 1.45rem;
-  height: 1.45rem;
+  width: 4.35rem;
+  height: 4.35rem;
+  border-radius: 4px;
 }
 
 .settings-link:focus-visible,
@@ -320,7 +326,7 @@ body {
   min-height: 100vh;
   min-height: 100svh;
   padding:
-    1rem
+    3.25rem
     var(--mobile-gutter)
     calc(var(--hero-stage-height) + env(safe-area-inset-bottom, 0px) + 1rem);
   border: none;
@@ -335,6 +341,7 @@ body {
 .history-header {
   display: grid;
   gap: 0.25rem;
+  max-width: calc(100% - 5.25rem);
 }
 
 .history-section h2 {
@@ -415,6 +422,16 @@ body {
   display: none;
 }
 
+.settings-loading {
+  padding: 0.9rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  border: 1px dashed var(--line);
+  border-radius: 4px;
+  background: rgba(11, 18, 27, 0.48);
+}
+
 .settings-page {
   overflow: auto;
 }
@@ -447,7 +464,7 @@ body {
 }
 
 .settings-header h1,
-.settings-header p,
+.settings-header h2,
 .settings-status {
   margin: 0;
 }
@@ -459,11 +476,12 @@ body {
   line-height: 1.1;
 }
 
-.settings-header p,
+.settings-header h2,
 .settings-description,
 .settings-status {
   color: var(--muted);
   font-size: 0.9rem;
+  font-weight: 400;
   line-height: 1.45;
 }
 
@@ -564,15 +582,17 @@ body {
 
 .settings-save-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.8rem;
+  margin-inline-end: 0.9rem;
 }
 
 .settings-save-row span {
   color: var(--text);
   font-size: 0.94rem;
   line-height: 1.35;
+  text-align: right;
 }
 
 @media (hover: hover) {
@@ -593,7 +613,6 @@ body {
   }
 
   .settings-link:hover,
-  .settings-save-button:hover,
   .settings-toggle:hover {
     border-color: var(--line-strong);
   }
@@ -634,6 +653,7 @@ body {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: end;
     column-gap: 1rem;
+    max-width: none;
   }
 
   .history-summary {
@@ -734,8 +754,9 @@ body {
   }
 
   .settings-link {
-    top: 1.25rem;
+    top: auto;
     right: 1.25rem;
+    bottom: 1.25rem;
   }
 
   .settings-shell {

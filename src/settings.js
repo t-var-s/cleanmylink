@@ -22,6 +22,7 @@ export function createSettingsApp({
     elements: {
       form: documentObject.querySelector("#settings-form"),
       list: documentObject.querySelector("#settings-list"),
+      saveButton: documentObject.querySelector(".settings-save-button"),
       saveLabel: documentObject.querySelector("#settings-save-label"),
       status: documentObject.querySelector("#settings-status")
     },
@@ -86,6 +87,16 @@ export function createSettingsApp({
         if (app.elements.status) {
           app.elements.status.textContent = message;
         }
+      },
+
+      setLoading(isLoading) {
+        if (app.elements.form) {
+          app.elements.form.setAttribute("aria-busy", isLoading ? "true" : "false");
+        }
+
+        if (app.elements.saveButton) {
+          app.elements.saveButton.disabled = isLoading;
+        }
       }
     },
 
@@ -116,10 +127,20 @@ export function createSettingsApp({
     },
 
     async init() {
-      app.state.savedSettings = await app.storage.readDomainTransformSettings();
+      app.ui.setLoading(true);
+
+      try {
+        app.state.savedSettings = await app.storage.readDomainTransformSettings();
+      } catch (error) {
+        app.state.savedSettings = getDefaultDomainTransformSettings();
+        app.ui.setStatus("Settings could not be loaded. Defaults are shown.");
+        consoleObject.error("Settings storage read failed", error);
+      }
+
       app.state.draftSettings = { ...app.state.savedSettings };
       app.ui.renderRules();
       app.ui.syncSaveLabel();
+      app.ui.setLoading(false);
       app.events.bind();
     }
   };

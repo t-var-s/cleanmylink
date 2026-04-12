@@ -55,6 +55,7 @@ export function createApp({
       buttonMode: "clean",
       pwaRegistration: null,
       isReloadingForUpdate: false,
+      isHistoryLoading: true,
       historyEntries: [],
       enabledTransforms: sharedTransforms.defaultEnabledTransforms
     },
@@ -240,7 +241,11 @@ export function createApp({
         const orderedEntries = app.ui.getOrderedEntries(entries);
 
         app.elements.historyList.innerHTML = "";
+        app.elements.historyEmpty.textContent = entries.length > 0
+          ? ""
+          : "No links cleaned yet.";
         app.elements.historyEmpty.hidden = entries.length > 0;
+        app.elements.historyEmpty.removeAttribute("aria-busy");
         app.ui.setHistorySummary(entries.length);
 
         for (const entry of orderedEntries) {
@@ -291,6 +296,23 @@ export function createApp({
         app.elements.historySummary.textContent = count > 0
           ? `${count} saved in the last 72 hours`
           : "Saved for 72 hours on this device.";
+      },
+
+      setHistoryLoading(isLoading) {
+        app.state.isHistoryLoading = isLoading;
+
+        if (!app.elements.historyEmpty) {
+          return;
+        }
+
+        if (!isLoading) {
+          app.elements.historyEmpty.removeAttribute("aria-busy");
+          return;
+        }
+
+        app.elements.historyEmpty.hidden = false;
+        app.elements.historyEmpty.textContent = "Loading saved links from this device...";
+        app.elements.historyEmpty.setAttribute("aria-busy", "true");
       }
     },
 
@@ -525,11 +547,20 @@ export function createApp({
         throw new Error("Clean My Link transforms failed to load.");
       }
 
+      app.ui.setHistoryLoading(true);
       await app.history.load();
-      app.state.enabledTransforms = composeEnabledTransforms(
-        await app.storage.readDomainTransformSettings()
-      );
+      app.ui.setHistoryLoading(false);
       app.layout.apply();
+
+      try {
+        app.state.enabledTransforms = composeEnabledTransforms(
+          await app.storage.readDomainTransformSettings()
+        );
+      } catch (error) {
+        app.state.enabledTransforms = composeEnabledTransforms();
+        consoleObject.error("Transform settings storage read failed", error);
+      }
+
       app.dev.installHelpers();
       app.events.bind();
       await app.pwa.register();

@@ -59,6 +59,7 @@ function createSettingsDocument() {
   const elements = {
     "#settings-form": new FakeElement("form"),
     "#settings-list": new FakeElement("ul"),
+    ".settings-save-button": new FakeElement("button"),
     "#settings-save-label": new FakeElement("span"),
     "#settings-status": new FakeElement("p")
   };
@@ -152,6 +153,8 @@ test("settings app stages domain transform changes and writes only on submit", a
     documentObject.elements["#settings-save-label"].textContent,
     "Confirm and go back to cleaning"
   );
+  assert.equal(documentObject.elements["#settings-form"].attributes.get("aria-busy"), "false");
+  assert.equal(documentObject.elements[".settings-save-button"].disabled, false);
   assert.deepEqual(writes, []);
 
   const redditInput = documentObject.inputs.find((input) => input.name === "rewrite-reddit-to-redlib");
@@ -201,5 +204,44 @@ test("settings app reports storage write failures without navigating", async () 
     documentObject.elements["#settings-status"].textContent,
     "Settings could not be saved on this device."
   );
+  assert.equal(errors.length, 1);
+});
+
+test("settings app falls back to defaults when storage cannot be read", async () => {
+  const documentObject = createSettingsDocument();
+  const errors = [];
+
+  const app = createSettingsApp({
+    documentObject,
+    windowObject: {
+      HTMLInputElement: FakeInput,
+      location: {
+        assign() {}
+      }
+    },
+    storage: {
+      async readDomainTransformSettings() {
+        throw new Error("storage unavailable");
+      },
+
+      async writeDomainTransformSettings() {}
+    },
+    consoleObject: {
+      error(...args) {
+        errors.push(args);
+      }
+    }
+  });
+
+  await app.init();
+
+  assert.deepEqual(app.state.savedSettings, getDefaultDomainTransformSettings());
+  assert.equal(documentObject.elements["#settings-list"].children.length, siteRules.length);
+  assert.equal(
+    documentObject.elements["#settings-status"].textContent,
+    "Settings could not be loaded. Defaults are shown."
+  );
+  assert.equal(documentObject.elements["#settings-form"].attributes.get("aria-busy"), "false");
+  assert.equal(documentObject.elements[".settings-save-button"].disabled, false);
   assert.equal(errors.length, 1);
 });
