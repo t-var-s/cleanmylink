@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const transforms = require("../transforms.js");
+const transforms = require("../src/transforms.js");
 
 test("cleanUrl removes standard and known tracking parameters while preserving others", () => {
   const input = new URL(

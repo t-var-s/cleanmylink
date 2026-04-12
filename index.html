@@ -20,10 +20,10 @@
     <meta name="twitter:image:alt" content="Clean My Link artwork showing a broom sweeping away URL tracking parameters">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
     <meta name="referrer" content="no-referrer">
-    <link rel="manifest" href="manifest.webmanifest">
-    <link rel="icon" href="assets/favicon-48-v4.png" type="image/png" sizes="48x48">
-    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon-180-v4.png">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/assets/favicon-48-v4.png" type="image/png" sizes="48x48">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon-180-v4.png">
+    <link rel="stylesheet" href="/src/styles.css">
     <title>Clean My Link</title>
   </head>
   <body>
@@ -67,7 +67,6 @@
       </div>
     </main>
 
-    <script src="transforms.js" defer></script>
-    <script src="app.js" defer></script>
+    <script type="module" src="/src/app.js"></script>
   </body>
 </html>

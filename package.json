@@ -3,11 +3,18 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "build": "node -e \"console.log('Static site: no build step required.')\"",
-    "start": "python3 -m http.server 4173",
-    "serve": "python3 -m http.server 4173",
-    "test": "node --test",
-    "netlify:deploy": "npx netlify deploy",
-    "netlify:deploy:prod": "npx netlify deploy --prod"
+    "dev": "vite --host 127.0.0.1 --port 5173",
+    "build": "vite build && node scripts/generate-sw.js",
+    "start": "vite --host 127.0.0.1 --port 5173",
+    "serve": "vite preview --host 127.0.0.1 --port 4173",
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "test:unit": "node --test test/transforms.test.js",
+    "test:build": "node --test test/build.test.js",
+    "test": "npm run test:unit && npm run build && npm run test:build",
+    "netlify:deploy": "npm run build && npx netlify deploy --dir=dist",
+    "netlify:deploy:prod": "npm run build && npx netlify deploy --prod --dir=dist"
+  },
+  "devDependencies": {
+    "vite": "^8.0.8"
   }
 }

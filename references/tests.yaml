@@ -1,5 +1,5 @@
 version: 1
-verified_on: 2026-04-07
+verified_on: 2026-04-12
 
 automated:
   - id: transforms-tracking-params
@@ -63,13 +63,30 @@ automated:
       - parseUrl accepts http and https URLs
       - parseUrl rejects non-http schemes
 
+  - id: build-output-excludes-source-only-directories
+    type: build
+    file: test/build.test.js
+    command: npm test
+    covers:
+      - dist contains the deployable app files
+      - dist excludes references, test, scripts, and src directories
+
+  - id: build-generates-service-worker
+    type: build
+    file: test/build.test.js
+    command: npm test
+    covers:
+      - generated sw.js includes a stamped cache version
+      - generated sw.js includes built app shell assets
+      - generated sw.js does not include unreplaced placeholders
+
 manual_verified:
   - id: browser-clean-url-success
     type: browser
     tool: playwright-cli
     setup:
       - start the app with npm run start
-      - open http://127.0.0.1:4173
+      - open http://127.0.0.1:5173
       - grant clipboard-read and clipboard-write permissions for that origin
     steps:
       - write "https://example.com/path?utm_source=test&keep=1" to the clipboard
@@ -163,7 +180,9 @@ manual_verified:
     type: browser
     tool: playwright-cli
     setup:
-      - start the app with npm run start
+      - build the app with npm run build
+      - start the production preview with npm run preview
+      - open http://127.0.0.1:4173
     steps:
       - wait for the page to settle
       - inspect service worker registrations

@@ -7,14 +7,13 @@
 .netlify/
 .playwright/
 .playwright-cli/
+dist/
+node_modules/
 
 # Local AI assistant/project metadata
 .agents/
 .claude/
 skills-lock.json
-
-# Local project config
-netlify.toml
 
 #editors
 *.swp

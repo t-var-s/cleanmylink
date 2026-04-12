@@ -1,3 +1,5 @@
+import "./transforms.js";
+
 const sharedTransforms = globalThis.cleanMyLinkTransforms;
 
 const app = {
@@ -394,6 +396,10 @@ const app = {
     },
 
     async register() {
+      if (import.meta.env?.DEV) {
+        return;
+      }
+
       if (!("serviceWorker" in navigator)) {
         return;
       }

@@ -1,29 +1,35 @@
 ## Current architecture
 
-This is a static client-side app with no build step and no backend. The runtime is plain HTML, CSS, and browser JavaScript.
+This is a static client-side app with a Vite build step and no backend. The source runtime remains plain HTML, CSS, and browser JavaScript; Vite bundles the browser entry and writes the deployable site to `dist/`.
 
-Verified on April 7, 2026:
+Verified on April 12, 2026:
 
 - `npm test` passes
-- the app runs locally from a static server
+- `npm run build` writes the deploy artifact to `dist/`
+- `dist/` excludes source-only directories such as `references/`, `test/`, `scripts/`, and `src/`
+- the app runs locally from the Vite dev server and Vite preview server
 - the main clipboard flow works in-browser when clipboard permissions are granted
 - the blocked-permission path, empty-clipboard path, text-cleaning path, URL-cleaning path, history rendering, service worker registration, and manifest availability were all checked in a local browser session
 
 ## File map
 
-- [`index.html`](index.html): app shell, metadata, CSP, manifest link, hero panel, button, history section, and deferred script loading
-- [`styles.css`](styles.css): mobile-first layout, button and history styling, responsive desktop breakpoint at `960px`, and reduced-motion handling
-- [`transforms.js`](transforms.js): shared cleanup logic for URLs and plain text; exposed on `globalThis` for the browser and `module.exports` for tests
-- [`app.js`](app.js): application controller for clipboard access, history persistence, responsive layout, button states, and service worker update handling
-- [`sw.js`](sw.js): versioned app-shell caching plus cache cleanup and `SKIP_WAITING` support
-- [`manifest.webmanifest`](manifest.webmanifest): install metadata and app icons
-- [`test/transforms.test.js`](test/transforms.test.js): Node test suite for transform behavior
-- [`assets/`](assets): install icons and social preview image
-- [`assets/favicon-48-v4.png`](assets/favicon-48-v4.png): favicon
+- [`../index.html`](../index.html): Vite HTML entry, metadata, CSP, manifest link, hero panel, button, history section, and module script loading
+- [`../src/styles.css`](../src/styles.css): mobile-first layout, button and history styling, responsive desktop breakpoint at `960px`, and reduced-motion handling
+- [`../src/transforms.js`](../src/transforms.js): shared cleanup logic for URLs and plain text; exposed on `globalThis` for the browser and `module.exports` for tests
+- [`../src/app.js`](../src/app.js): application controller for clipboard access, history persistence, responsive layout, button states, and service worker update handling
+- [`../src/sw-template.js`](../src/sw-template.js): service worker template with build-time placeholders for app version and precached app-shell paths
+- [`../public/manifest.webmanifest`](../public/manifest.webmanifest): install metadata and app icons, copied to `dist/` by Vite
+- [`../public/assets/`](../public/assets): stable-path install icons, social preview image, and other public assets copied to `dist/assets/`
+- [`../src/assets/`](../src/assets): source assets imported by bundled CSS, such as local fonts
+- [`../scripts/generate-sw.js`](../scripts/generate-sw.js): post-build service worker generator that writes `dist/sw.js`
+- [`../vite.config.mjs`](../vite.config.mjs): Vite config with explicit `dist` output
+- [`../netlify.toml`](../netlify.toml): Netlify build command, publish directory, and cache/security headers
+- [`../test/transforms.test.js`](../test/transforms.test.js): Node test suite for transform behavior
+- [`../test/build.test.js`](../test/build.test.js): Node test suite for build output and generated service worker behavior
 
 ## Runtime implementation details
 
-### `transforms.js`
+### `src/transforms.js`
 
 The transform layer is an IIFE that publishes a single shared object. That object currently exposes:
 
@@ -51,7 +57,7 @@ Current site rules:
 - `reddit.com` -> `redlib.freedit.eu`
 - `youtube.com` / `youtu.be` -> clear search params, then keep only `v` if present
 
-### `app.js`
+### `src/app.js`
 
 `app.js` is organized as a single `app` object with grouped concerns:
 
@@ -115,6 +121,7 @@ Localhost development helper:
 - On `localhost`, `127.0.0.1`, and `[::1]`, `app.dev.installHelpers()` exposes `window.resetAppCache(...)`.
 - `window.resetAppCache({ reload = true })` unregisters local service workers, clears Cache Storage, and optionally reloads the page.
 - The helper is intended for local iteration when the service worker's cache-first behavior would otherwise keep stale assets in the browser.
+- Service worker registration is skipped in Vite dev mode through `import.meta.env.DEV`, so local HMR is not controlled by a production worker.
 
 ### `index.html`
 
@@ -124,13 +131,14 @@ Security and metadata already live in the document shell:
 - `referrer` policy set to `no-referrer`
 - Open Graph and Twitter card metadata
 - manifest and icon links
+- Vite module entry: `/src/app.js`
 
 The body contains only two user-facing sections:
 
 - hero/action panel
 - recent-links panel
 
-### `styles.css`
+### `src/styles.css`
 
 The CSS matches the current product direction:
 
@@ -140,13 +148,29 @@ The CSS matches the current product direction:
 - two-column product layout on desktop
 - hover refinements only inside `@media (hover: hover)`
 - global reduced-motion fallback
+- local fonts are referenced from `src/assets/`, so Vite fingerprints them into `dist/assets/`
 
-### `sw.js`
+### Vite build
 
-The service worker uses a versioned cache name:
+The production build is:
 
-- `APP_VERSION` is the manual cache-busting switch
+- `npm run build`
+- `vite build`
+- `node scripts/generate-sw.js`
+
+Vite writes the deployable site to `dist/`. That output contains the app shell, bundled and fingerprinted JS/CSS/font assets, files copied from `public/`, and the generated `sw.js`.
+
+`references/`, `test/`, `scripts/`, and `src/` are not publishable production artifacts. `test/build.test.js` checks that those directories are absent from `dist/`.
+
+### `src/sw-template.js` and `dist/sw.js`
+
+The source service worker is a template. `scripts/generate-sw.js` reads the completed `dist/` tree after Vite runs, replaces placeholders, and writes `dist/sw.js`.
+
+The generated service worker uses a versioned cache name:
+
+- `APP_VERSION` is generated at build time from the package version, git short SHA, and a build ID or timestamp
 - `CACHE_NAME` is derived from `APP_VERSION`
+- `APP_SHELL` is generated from the actual files in `dist/`, excluding `sw.js` itself
 
 Current behavior:
 
@@ -157,7 +181,7 @@ Current behavior:
 - serves cached GET responses first
 - caches successful same-origin GET responses after network fetches
 
-### `manifest.webmanifest`
+### `public/manifest.webmanifest`
 
 The manifest currently defines:
 
@@ -181,7 +205,8 @@ Current security-relevant measures in the codebase:
 
 Current automated coverage:
 
-- transform behavior in [`test/transforms.test.js`](test/transforms.test.js)
+- transform behavior in [`../test/transforms.test.js`](../test/transforms.test.js)
+- build output and generated service worker checks in [`../test/build.test.js`](../test/build.test.js)
 
 Current gaps:
 
@@ -198,9 +223,21 @@ Run locally:
 npm run start
 ```
 
-Current local server:
+Current Vite dev server:
 
-- `python3 -m http.server 4173`
+- `http://127.0.0.1:5173/`
+- use `npm run dev -- --port 5174` when a second developer or browser session needs a separate port
+
+Preview the built production artifact:
+
+```bash
+npm run build
+npm run preview
+```
+
+Current Vite preview server:
+
+- `http://127.0.0.1:4173/`
 
 Run tests:
 
@@ -226,4 +263,11 @@ Deploy production:
 npm run netlify:deploy:prod
 ```
 
-Before shipping a new PWA version, bump `APP_VERSION` in [`sw.js`](sw.js) so installed clients rotate caches and detect the update.
+Netlify uses [`../netlify.toml`](../netlify.toml):
+
+- build command: `npm run build`
+- publish directory: `dist`
+- `sw.js` and `manifest.webmanifest` revalidate on each request
+- built assets under `/assets/*` are cacheable as immutable
+
+The PWA cache version is generated during `npm run build`; do not manually edit `APP_VERSION` in the generated `dist/sw.js`.
