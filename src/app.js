@@ -1,20 +1,24 @@
 import * as sharedTransforms from "./transforms.js";
+import { createStorageAdapter } from "./storage.js";
+import { composeEnabledTransforms } from "./settings-storage.js";
 
 export function createApp({
   documentObject = globalThis.document,
   windowObject = globalThis.window,
   navigatorObject = globalThis.navigator,
-  localStorageObject = globalThis.localStorage,
+  storage,
+  storageObject,
   locationObject = globalThis.location,
   consoleObject = globalThis.console
 } = {}) {
-  if (!documentObject || !windowObject || !navigatorObject || !localStorageObject || !locationObject) {
+  if (!documentObject || !windowObject || !navigatorObject || !locationObject) {
     throw new Error("Clean My Link app requires browser globals or injected test doubles.");
   }
 
+  const storageAdapter = storage || createStorageAdapter({ storageObject });
+
   const app = {
     config: {
-      storageKey: "clean-my-link-history",
       historyTtlMs: 72 * 60 * 60 * 1000,
       historyLimit: 100,
       desktopBreakpoint: 960,
@@ -51,21 +55,13 @@ export function createApp({
       buttonMode: "clean",
       pwaRegistration: null,
       isReloadingForUpdate: false,
-      historyEntries: []
+      historyEntries: [],
+      enabledTransforms: sharedTransforms.defaultEnabledTransforms
     },
 
     transforms: sharedTransforms,
 
-    storage: {
-      async readHistoryEntries() {
-        const entries = JSON.parse(localStorageObject.getItem(app.config.storageKey) || "[]");
-        return Array.isArray(entries) ? entries : [];
-      },
-
-      async writeHistoryEntries(entries) {
-        localStorageObject.setItem(app.config.storageKey, JSON.stringify(entries));
-      }
-    },
+    storage: storageAdapter,
 
     history: {
       async load() {
@@ -309,7 +305,9 @@ export function createApp({
           };
         }
 
-        const result = app.transforms.cleanInput(clipboardText);
+        const result = app.transforms.cleanInput(clipboardText, {
+          enabledTransforms: app.state.enabledTransforms
+        });
         await navigatorObject.clipboard.writeText(result.output);
         app.ui.setStatus(result.changed ? "success" : "unchanged");
 
@@ -528,6 +526,9 @@ export function createApp({
       }
 
       await app.history.load();
+      app.state.enabledTransforms = composeEnabledTransforms(
+        await app.storage.readDomainTransformSettings()
+      );
       app.layout.apply();
       app.dev.installHelpers();
       app.events.bind();

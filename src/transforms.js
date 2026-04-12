@@ -81,6 +81,7 @@ const transformDefinitionsSource = [
 
   {
     id: "rewrite-x-to-fxtwitter",
+    domainLabel: "x.com",
     label: "Open X posts with fxtwitter.com",
     type: "url",
     category: "site",
@@ -96,6 +97,7 @@ const transformDefinitionsSource = [
 
   {
     id: "rewrite-reddit-to-redlib",
+    domainLabel: "reddit.com",
     label: "Open Reddit links with Redlib",
     type: "url",
     category: "site",
@@ -111,6 +113,7 @@ const transformDefinitionsSource = [
 
   {
     id: "keep-youtube-video-id",
+    domainLabel: "youtube.com and youtu.be",
     label: "Keep only the YouTube video ID",
     type: "url",
     category: "site",

@@ -130,3 +130,12 @@ Ordering rules:
 - If the device is offline during update mode:
   - status becomes `Network went offline, can't update.`
   - button label becomes `Try again`
+
+## Settings
+
+The app has a page where users can specify what URL transformations are on or off for specific domains.
+
+- Only domain-specific URL transformations are configurable.
+- Global cleanup rules, including tracking-parameter cleanup, always apply.
+- Settings changes are saved only when the user confirms from the settings page.
+- The settings save action returns the user to the main cleaning page.

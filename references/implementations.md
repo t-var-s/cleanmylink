@@ -13,11 +13,16 @@ Verified on April 12, 2026:
 
 ## File map
 
-- [`../index.html`](../index.html): Vite HTML entry, metadata, CSP, manifest link, hero panel, button, history section, and module script loading
-- [`../src/styles.css`](../src/styles.css): mobile-first layout, button and history styling, responsive desktop breakpoint at `960px`, and reduced-motion handling
+- [`../index.html`](../index.html): main Vite HTML entry, metadata, CSP, manifest link, settings navigation, hero panel, button, history section, and module script loading
+- [`../settings.html`](../settings.html): settings Vite HTML entry for domain-transform toggles and save navigation
+- [`../src/styles.css`](../src/styles.css): mobile-first layout, button, history, settings, view-transition, responsive desktop breakpoint at `960px`, and reduced-motion handling
 - [`../src/transforms.js`](../src/transforms.js): ESM transform registry and shared cleanup logic for URLs and plain text
 - [`../src/app.js`](../src/app.js): app factory and controller for clipboard access, history persistence, responsive layout, button states, and service worker update handling
 - [`../src/main.js`](../src/main.js): browser bootstrap entry that starts the app
+- [`../src/storage.js`](../src/storage.js): async storage adapter used by app and settings controllers
+- [`../src/settings-storage.js`](../src/settings-storage.js): settings normalization, defaulting, serialization, and enabled-transform composition helpers
+- [`../src/settings.js`](../src/settings.js): settings page factory and controller for rendering domain toggles and saving staged changes
+- [`../src/settings-main.js`](../src/settings-main.js): browser bootstrap entry that starts the settings page
 - [`../src/sw-template.js`](../src/sw-template.js): service worker template with build-time placeholders for app version and precached app-shell paths
 - [`../public/manifest.webmanifest`](../public/manifest.webmanifest): install metadata and app icons, copied to `dist/` by Vite
 - [`../public/assets/`](../public/assets): stable-path install icons, social preview image, and other public assets copied to `dist/assets/`
@@ -26,6 +31,7 @@ Verified on April 12, 2026:
 - [`../vite.config.mjs`](../vite.config.mjs): Vite config with explicit `dist` output
 - [`../netlify.toml`](../netlify.toml): Netlify build command, publish directory, and cache/security headers
 - [`../test/transforms.test.js`](../test/transforms.test.js): Node test suite for transform behavior
+- [`../test/storage.test.js`](../test/storage.test.js): Node test suite for the storage adapter and domain-transform settings behavior
 - [`../test/app.test.js`](../test/app.test.js): Node test suite for app module import safety
 - [`../test/build.test.js`](../test/build.test.js): Node test suite for build output and generated service worker behavior
 
@@ -56,6 +62,7 @@ Implementation choices:
 - URL cleaning always clones the input URL before mutation.
 - Tracking-parameter stripping is case-insensitive.
 - Transforms are defined with stable `id`, `label`, `type`, `category`, `defaultEnabled`, and `apply` metadata so a settings UI can persist user choices without depending on array order.
+- Site-rule transforms also expose `domainLabel` metadata for the settings UI.
 - `apply(...)` receives a context object with the active `enabledTransforms` map, so later transforms can inspect settings without changing the registry contract.
 - `cleanUrl`, `cleanText`, and `cleanInput` accept an optional `enabledTransforms` map. Missing keys fall back to each transform's `defaultEnabled` value.
 - Plain-text cleaning converts all-caps text to sentence case only when there are at least two letters.
@@ -100,7 +107,7 @@ Important behavior in the current implementation:
 History handling:
 
 - Storage access goes through async `storage.readHistoryEntries()` and `storage.writeHistoryEntries()` methods.
-- The storage adapter is currently backed by `localStorage`, leaving room for IndexedDB or encrypted storage later.
+- Storage access goes through the shared async adapter in `src/storage.js`; the backing store is currently `localStorage`, leaving room for IndexedDB or encrypted storage later.
 - History entries are loaded into `state.historyEntries` during app startup.
 - Rendering reads from in-memory state instead of reading storage directly.
 - History loading is wrapped in `try/catch` so malformed local storage does not break the app.
@@ -127,8 +134,34 @@ Clipboard flow:
 
 - Reads via `navigator.clipboard.readText()`
 - Writes the cleaned output with `navigator.clipboard.writeText(...)`
+- Reads domain-transform settings through `storage.readDomainTransformSettings()` before cleaning and composes them with default transforms.
 - Shows blocked/error/empty/success status messages based on the outcome
 - Stores only URL results in history
+
+### Settings
+
+The settings page only exposes site-specific URL transforms:
+
+- `x.com` -> `fxtwitter.com`
+- `reddit.com` -> `redlib.freedit.eu`
+- `youtube.com` / `youtu.be` query cleanup
+
+Settings behavior:
+
+- Global tracking-parameter cleanup and plain-text cleanup are not exposed in settings and continue to apply by default.
+- Settings are staged in memory while the user changes toggles.
+- The save action uses a square icon button with `/assets/icon_save.webp` and adjacent text.
+- The save label starts as `Confirm and go back to cleaning`.
+- The save label changes to `Save changes and go back to cleaning` when staged settings differ from saved settings.
+- On save, the settings controller writes through `storage.writeDomainTransformSettings(...)` and navigates back to `/`.
+- Malformed settings storage falls back to default-enabled domain rules.
+- Missing transform IDs fall back to each transform's `defaultEnabled` value.
+
+Settings storage:
+
+- Storage key: `clean-my-link-transform-settings`
+- Stored shape: `{ version: 1, enabledTransforms: { [transformId]: boolean } }`
+- Only site-rule transform IDs are serialized; any global cleanup IDs are ignored by normalization.
 
 Localhost development helper:
 
@@ -152,6 +185,8 @@ The body contains only two user-facing sections:
 - hero/action panel
 - recent-links panel
 
+It also includes a top-right settings link using `/assets/icon_settings.webp`.
+
 ### `src/styles.css`
 
 The CSS matches the current product direction:
@@ -160,6 +195,8 @@ The CSS matches the current product direction:
 - restrained card styling rather than marketing-heavy chrome
 - fixed bottom action area on mobile
 - two-column product layout on desktop
+- settings page styles for the domain-toggle form
+- cross-document View Transitions API opt-in with normal navigation fallback
 - hover refinements only inside `@media (hover: hover)`
 - global reduced-motion fallback
 - local fonts are referenced from `src/assets/`, so Vite fingerprints them into `dist/assets/`
@@ -172,7 +209,7 @@ The production build is:
 - `vite build`
 - `node scripts/generate-sw.js`
 
-Vite writes the deployable site to `dist/`. That output contains the app shell, bundled and fingerprinted JS/CSS/font assets, files copied from `public/`, and the generated `sw.js`.
+Vite writes the deployable site to `dist/`. That output contains the app shell, `index.html`, `settings.html`, bundled and fingerprinted JS/CSS/font assets, files copied from `public/`, and the generated `sw.js`.
 
 `references/`, `test/`, `scripts/`, and `src/` are not publishable production artifacts. `test/build.test.js` checks that those directories are absent from `dist/`.
 
@@ -220,6 +257,7 @@ Current security-relevant measures in the codebase:
 Current automated coverage:
 
 - transform behavior in [`../test/transforms.test.js`](../test/transforms.test.js)
+- settings storage and domain-only settings behavior in [`../test/storage.test.js`](../test/storage.test.js)
 - import-safety coverage for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
 - build output and generated service worker checks in [`../test/build.test.js`](../test/build.test.js)
 

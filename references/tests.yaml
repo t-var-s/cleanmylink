@@ -17,6 +17,31 @@ automated:
     covers:
       - transform definitions expose stable ids
       - transform definitions expose labels, types, and default enabled state for settings UI
+      - site-rule transform definitions expose domain labels for settings UI
+
+  - id: storage-domain-transform-settings
+    type: unit
+    file: test/storage.test.js
+    command: npm test
+    covers:
+      - domain transform settings persist through the shared storage adapter
+      - only site-rule transform ids are serialized
+      - global cleanup transform ids are ignored
+
+  - id: storage-domain-settings-global-cleanup
+    type: unit
+    file: test/storage.test.js
+    command: npm test
+    covers:
+      - disabled domain transforms are composed with default global cleanup settings
+      - tracking parameter cleanup remains enabled even if a saved settings payload includes it as disabled
+
+  - id: storage-domain-settings-malformed
+    type: unit
+    file: test/storage.test.js
+    command: npm test
+    covers:
+      - malformed domain settings storage falls back to default-enabled site rules
 
   - id: transforms-disabled-tracking-params
     type: unit
@@ -106,6 +131,7 @@ automated:
     command: npm test
     covers:
       - dist contains the deployable app files
+      - dist contains the settings page
       - dist excludes references, test, scripts, and src directories
 
   - id: build-generates-service-worker
@@ -115,6 +141,7 @@ automated:
     covers:
       - generated sw.js includes a stamped cache version
       - generated sw.js includes built app shell assets
+      - generated sw.js includes the settings page and settings entry
       - generated sw.js does not include unreplaced placeholders
 
 manual_verified:
@@ -174,6 +201,40 @@ manual_verified:
       - x.com result becomes "https://fxtwitter.com/someuser/status/42"
       - YouTube result becomes "https://www.youtube.com/watch?v=abc123"
       - both cleaned URLs appear in recent links
+
+  - id: browser-settings-domain-rules
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run start
+      - open http://127.0.0.1:5173
+      - grant clipboard-read and clipboard-write permissions
+    steps:
+      - open settings from the top-right icon
+      - turn off the reddit.com domain transform
+      - confirm the save label changes to "Save changes and go back to cleaning"
+      - click the save button
+      - clean "https://www.reddit.com/r/node/comments/abc123/post?utm_source=share&keep=ok"
+    expected:
+      - navigation returns to the main cleaning page
+      - clipboard becomes "https://www.reddit.com/r/node/comments/abc123/post?keep=ok"
+      - tracking cleanup still applies
+      - the reddit.com host rewrite does not apply
+
+  - id: browser-settings-responsive-layout
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run start
+      - open http://127.0.0.1:5173/settings.html
+    steps:
+      - review the settings page at a mobile viewport around 390x844
+      - review the settings page at a desktop viewport around 1440x900
+      - review the main page at the same mobile and desktop viewports
+    expected:
+      - toggle text fits without overflow
+      - the save label fits beside the square save icon button
+      - the settings icon stays in the top-right corner without blocking primary controls
 
   - id: browser-history-layout-ordering
     type: browser

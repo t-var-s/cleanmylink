@@ -21,6 +21,10 @@ test("transform definitions expose stable settings metadata", () => {
     assert.equal(typeof definition.defaultEnabled, "boolean");
     assert.ok(["url", "text"].includes(definition.type));
   }
+
+  for (const definition of transforms.siteRules) {
+    assert.equal(typeof definition.domainLabel, "string");
+  }
 });
 
 test("cleanUrl removes standard and known tracking parameters while preserving others", () => {

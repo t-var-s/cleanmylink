@@ -22,6 +22,7 @@ function readDistFile(...segments) {
 
 test("build output publishes the generated site without source-only directories", () => {
   assert.ok(existsInDist("index.html"));
+  assert.ok(existsInDist("settings.html"));
   assert.ok(existsInDist("manifest.webmanifest"));
   assert.ok(existsInDist("sw.js"));
   assert.ok(existsInDist("assets"));
@@ -42,9 +43,11 @@ test("generated service worker includes a stamped cache version and built app sh
   assert.doesNotMatch(serviceWorker, /__APP_VERSION__/);
   assert.doesNotMatch(serviceWorker, /__APP_SHELL__/);
   assert.match(serviceWorker, /\.\/index\.html/);
+  assert.match(serviceWorker, /\.\/settings\.html/);
   assert.match(serviceWorker, /\.\/manifest\.webmanifest/);
   assert.match(serviceWorker, /\.\/assets\/index-[^"]+\.js/);
-  assert.match(serviceWorker, /\.\/assets\/index-[^"]+\.css/);
+  assert.match(serviceWorker, /\.\/assets\/settings-[^"]+\.js/);
+  assert.match(serviceWorker, /\.\/assets\/[^"]+\.css/);
   assert.match(serviceWorker, /\.\/assets\/favicon-48-v4\.png/);
   assert.match(serviceWorker, /\.\/assets\/icon-192-v4\.png/);
   assert.doesNotMatch(serviceWorker, /\.\/references\//);
