@@ -98,10 +98,10 @@ Example:
 - Only cleaned HTTP(S) URLs are stored in history.
 - History is saved in `localStorage`.
 - Entries are stored under the `clean-my-link-history` key.
-- Entries expire after 24 hours.
+- Entries expire after 72 hours.
 - Invalid or expired entries are discarded before rendering.
 - Duplicate URLs are de-duplicated so the newest clean wins.
-- History is capped at 20 entries.
+- History is capped at 100 entries.
 - Each item opens in a new tab with safe external-link attributes.
 
 Ordering rules:

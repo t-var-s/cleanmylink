@@ -3,8 +3,8 @@ const sharedTransforms = globalThis.cleanMyLinkTransforms;
 const app = {
   config: {
     storageKey: "clean-my-link-history",
-    historyTtlMs: 24 * 60 * 60 * 1000,
-    historyLimit: 20,
+    historyTtlMs: 72 * 60 * 60 * 1000,
+    historyLimit: 100,
     desktopBreakpoint: 960,
     defaultStatus: "Remove junk parameters from any URL you've just copied.",
     defaultButtonLabel: "Clean My Copied Link"

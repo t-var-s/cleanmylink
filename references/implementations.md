@@ -70,8 +70,8 @@ Current site rules:
 Important behavior in the current implementation:
 
 - Local history key: `clean-my-link-history`
-- History TTL: `24 * 60 * 60 * 1000`
-- History limit: `20`
+- History TTL: `72 * 60 * 60 * 1000`
+- History limit: `100`
 - Desktop breakpoint: `960`
 - Default button mode: clean
 - Alternate button modes: update, retry-update
