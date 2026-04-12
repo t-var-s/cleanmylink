@@ -265,8 +265,8 @@ const app = {
       }
 
       app.elements.historySummary.textContent = count > 0
-        ? `${count} saved in the last 24 hours`
-        : "Saved for 24 hours on this device.";
+        ? `${count} saved in the last 72 hours`
+        : "Saved for 72 hours on this device.";
     }
   },
 
