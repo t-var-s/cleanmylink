@@ -134,7 +134,7 @@ Clipboard flow:
 
 - Reads via `navigator.clipboard.readText()`
 - Writes the cleaned output with `navigator.clipboard.writeText(...)`
-- Reads domain-transform settings through `storage.readDomainTransformSettings()` before cleaning and composes them with default transforms.
+- Reads domain-transform settings during app startup through `storage.readDomainTransformSettings()`, composes them with default transforms, and keeps the resulting enabled-transform map in memory for clipboard cleaning.
 - Shows blocked/error/empty/success status messages based on the outcome
 - Stores only URL results in history
 
@@ -258,6 +258,7 @@ Current automated coverage:
 
 - transform behavior in [`../test/transforms.test.js`](../test/transforms.test.js)
 - settings storage and domain-only settings behavior in [`../test/storage.test.js`](../test/storage.test.js)
+- settings page controller behavior in [`../test/settings.test.js`](../test/settings.test.js)
 - import-safety coverage for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
 - build output and generated service worker checks in [`../test/build.test.js`](../test/build.test.js)
 

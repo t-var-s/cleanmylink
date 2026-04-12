@@ -125,6 +125,18 @@ automated:
       - app module can be imported in Node without querying browser DOM globals
       - app bootstrapping is separated from app factory exports
 
+  - id: settings-controller-domain-settings
+    type: unit
+    file: test/settings.test.js
+    command: npm test
+    covers:
+      - settings app renders one toggle for each site-rule transform
+      - settings app stages checkbox changes in memory without writing storage
+      - settings app updates the save label when staged settings differ
+      - settings app writes domain-transform settings only on submit
+      - settings app returns to the main cleaning page after a successful save
+      - settings app reports storage write failures without navigating
+
   - id: build-output-excludes-source-only-directories
     type: build
     file: test/build.test.js
