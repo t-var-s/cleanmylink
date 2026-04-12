@@ -82,7 +82,7 @@ body {
   padding:
     0
     var(--mobile-gutter)
-    calc(env(safe-area-inset-bottom, 0px) + var(--mobile-gutter));
+    0;
 }
 
 .app-panel {
