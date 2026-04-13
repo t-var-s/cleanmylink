@@ -2,7 +2,7 @@
 
 This is a static client-side app with a Vite build step and no backend. The source runtime remains plain HTML, CSS, and browser JavaScript; Vite bundles the browser entry and writes the deployable site to `dist/`.
 
-Verified on April 12, 2026:
+Verified on April 13, 2026:
 
 - `npm test` passes
 - `npm run build` writes the deploy artifact to `dist/`
@@ -32,7 +32,7 @@ Verified on April 12, 2026:
 - [`../netlify.toml`](../netlify.toml): Netlify build command, publish directory, and cache/security headers
 - [`../test/transforms.test.js`](../test/transforms.test.js): Node test suite for transform behavior
 - [`../test/storage.test.js`](../test/storage.test.js): Node test suite for the storage adapter and domain-transform settings behavior
-- [`../test/app.test.js`](../test/app.test.js): Node test suite for app module import safety
+- [`../test/app.test.js`](../test/app.test.js): Node test suite for app module import safety, history behavior, clipboard cleaning, responsive history ordering, and PWA update button states
 - [`../test/build.test.js`](../test/build.test.js): Node test suite for build output and generated service worker behavior
 
 ## Runtime implementation details
@@ -186,6 +186,8 @@ Security and metadata already live in the document shell:
 - manifest and icon links
 - Vite module entry: `/src/main.js`
 
+Most shared head metadata is currently duplicated between `index.html` and `settings.html`. The page-specific values are title and description content, while PWA links, theme color, social image metadata, CSP, referrer policy, and stylesheet wiring are shared. A future Vite build improvement should centralize this in a small page metadata registry and inject the shared tags with `transformIndexHtml`, so adding another HTML entry does not require copying the same PWA and security metadata again.
+
 The body contains only two user-facing sections:
 
 - hero/action panel
@@ -220,6 +222,12 @@ The production build is:
 Vite writes the deployable site to `dist/`. That output contains the app shell, `index.html`, `settings.html`, bundled and fingerprinted JS/CSS/font assets, files copied from `public/`, and the generated `sw.js`.
 
 `references/`, `test/`, `scripts/`, and `src/` are not publishable production artifacts. `test/build.test.js` checks that those directories are absent from `dist/`.
+
+Build-step follow-ups:
+
+- Generate shared HTML head metadata from one Vite-side source, while keeping page-specific title and description overrides per HTML entry.
+- Consider deriving `build.rollupOptions.input` from the same page registry used for metadata so new pages have one source of truth.
+- Avoid CSP drift between HTML and deploy headers. The same CSP currently appears in page-level meta tags and in `netlify.toml`; either generate both from one constant or treat the Netlify header as the production authority and add a build/test assertion for alignment.
 
 ### `src/sw-template.js` and `dist/sw.js`
 
@@ -258,6 +266,7 @@ Current security-relevant measures in the codebase:
 - user content is rendered through safe DOM APIs
 - external links use `noopener noreferrer`
 - CSP disallows remote scripts, objects, and forms
+- the CSP is duplicated as HTML meta policy and Netlify response header, so future changes should keep those sources synchronized or consolidate the policy into one build-time source
 - the service worker only writes successful same-origin GET responses into cache
 
 ## Validation status and gaps
@@ -267,15 +276,13 @@ Current automated coverage:
 - transform behavior in [`../test/transforms.test.js`](../test/transforms.test.js)
 - settings storage and domain-only settings behavior in [`../test/storage.test.js`](../test/storage.test.js)
 - settings page controller behavior, including settings-read fallback and loading-state clearing, in [`../test/settings.test.js`](../test/settings.test.js)
-- import-safety coverage and startup history-loading behavior for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
+- import safety, startup history loading, history expiry pruning, history de-duplication, clipboard URL/text cleaning, responsive history ordering, and PWA update button states for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
 - build output and generated service worker checks in [`../test/build.test.js`](../test/build.test.js)
 
 Current gaps:
 
-- no broad automated coverage yet for `app.js` DOM behavior beyond startup history loading
 - no automated browser test for clipboard permission states
-- no automated test for history expiry, de-duplication, or desktop/mobile ordering
-- no automated test for service worker update mode transitions
+- no automated browser test for service worker registration, update lifecycle, or offline cache reuse
 
 ## Local development
 

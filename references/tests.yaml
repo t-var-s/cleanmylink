@@ -1,5 +1,5 @@
 version: 1
-verified_on: 2026-04-12
+verified_on: 2026-04-13
 
 automated:
   - id: transforms-tracking-params
@@ -124,6 +124,59 @@ automated:
     covers:
       - app module can be imported in Node without querying browser DOM globals
       - app bootstrapping is separated from app factory exports
+
+  - id: app-history-loading-state
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - app keeps the saved-links loading copy visible until history storage resolves
+      - app clears the history loading busy state after startup history loading completes
+
+  - id: app-history-pruning
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - app drops expired history entries during startup
+      - app drops unsafe non-HTTP history URLs during startup
+      - app writes pruned history entries back to storage
+
+  - id: app-history-deduplication
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - app de-duplicates saved URLs so the newest clean wins
+      - app ignores unsafe URLs when saving history
+
+  - id: app-clipboard-cleaning
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - app cleans clipboard URLs with saved domain-transform settings
+      - app writes cleaned URL output back to the clipboard
+      - app saves cleaned URL results to history
+      - app writes cleaned plain-text output back to the clipboard
+      - app does not save plain-text results to history
+
+  - id: app-history-responsive-ordering
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - desktop history renders newest entries first
+      - mobile history renders older entries above newer entries so the newest is closest to the action area
+
+  - id: app-pwa-update-actions
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - waiting service workers switch the primary button into offline retry mode when the device is offline
+      - waiting service workers switch the primary button into update mode when the device is online
+      - update activation posts a SKIP_WAITING message to the waiting worker
 
   - id: settings-controller-domain-settings
     type: unit
@@ -302,7 +355,5 @@ manual_verified:
       - manifest.webmanifest responds with HTTP 200
 
 gaps:
-  - history TTL expiry is implemented but not covered by automation
-  - URL-history de-duplication is implemented but not covered by automation
-  - service worker update and retry-update button states are not covered by automation
-  - there is no automated DOM test suite for app.js yet
+  - clipboard permission-denied handling is still covered by manual browser verification rather than automated browser tests
+  - service worker registration, update lifecycle, and offline cache reuse are still covered by manual browser verification rather than automated browser tests
