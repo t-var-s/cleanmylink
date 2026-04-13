@@ -82,7 +82,7 @@ const transformDefinitionsSource = [
   {
     id: "rewrite-x-to-fxtwitter",
     domainLabel: "x.com",
-    label: "Open X posts with fxtwitter.com",
+    label: "Change to fxtwitter.com",
     type: "url",
     category: "site",
     defaultEnabled: true,
@@ -98,7 +98,7 @@ const transformDefinitionsSource = [
   {
     id: "rewrite-reddit-to-redlib",
     domainLabel: "reddit.com",
-    label: "Open Reddit links with Redlib",
+    label: "Point to Redlib instead",
     type: "url",
     category: "site",
     defaultEnabled: true,
@@ -114,7 +114,7 @@ const transformDefinitionsSource = [
   {
     id: "keep-youtube-video-id",
     domainLabel: "youtube.com and youtu.be",
-    label: "Keep only the YouTube video ID",
+    label: "Keep only the video ID",
     type: "url",
     category: "site",
     defaultEnabled: true,
