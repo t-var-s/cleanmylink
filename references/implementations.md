@@ -13,8 +13,9 @@ Verified on April 13, 2026:
 
 ## File map
 
-- [`../index.html`](../index.html): main Vite HTML entry, metadata, CSP, manifest link, settings navigation, hero panel, button, history section, initial saved-links loading copy, and module script loading
-- [`../settings.html`](../settings.html): settings Vite HTML entry for domain-transform toggles, initial settings loading row, disabled-until-ready save navigation, and module script loading
+- [`../index.html`](../index.html): main Vite HTML entry with the shared head injection marker, settings navigation, hero panel, button, history section, initial saved-links loading copy, and module script loading
+- [`../settings.html`](../settings.html): settings Vite HTML entry with the shared head injection marker, domain-transform toggles, initial settings loading row, disabled-until-ready save navigation, and module script loading
+- [`../site.config.mjs`](../site.config.mjs): Vite-side page registry, shared head metadata, page-specific title/description values, and the shared CSP policy string
 - [`../src/styles.css`](../src/styles.css): mobile-first layout, button, history, settings, view-transition, responsive desktop breakpoint at `960px`, and reduced-motion handling
 - [`../src/transforms.js`](../src/transforms.js): ESM transform registry and shared cleanup logic for URLs and plain text
 - [`../src/app.js`](../src/app.js): app factory and controller for clipboard access, history persistence, startup history loading state, responsive layout, button states, and service worker update handling
@@ -176,17 +177,26 @@ Localhost development helper:
 - The helper is intended for local iteration when the service worker's cache-first behavior would otherwise keep stale assets in the browser.
 - Service worker registration is skipped in Vite dev mode through `import.meta.env.DEV`, so local HMR is not controlled by a production worker.
 
-### `index.html`
+### `index.html` and `settings.html`
 
-Security and metadata already live in the document shell:
+Each HTML entry keeps a small `<head>` containing an `<!-- app-head -->` marker. During the Vite HTML transform, `vite.config.mjs` injects generated head tags from `site.config.mjs`.
 
-- restrictive `Content-Security-Policy` in a meta tag
-- `referrer` policy set to `no-referrer`
-- Open Graph and Twitter card metadata
+Shared generated head metadata:
+
+- character set, viewport, theme color, and referrer policy
+- restrictive `Content-Security-Policy` meta tag
+- shared Open Graph and Twitter image metadata
 - manifest and icon links
-- Vite module entry: `/src/main.js`
+- stylesheet link to `/src/styles.css`, which Vite fingerprints in production
 
-Most shared head metadata is currently duplicated between `index.html` and `settings.html`. The page-specific values are title and description content, while PWA links, theme color, social image metadata, CSP, referrer policy, and stylesheet wiring are shared. A future Vite build improvement should centralize this in a small page metadata registry and inject the shared tags with `transformIndexHtml`, so adding another HTML entry does not require copying the same PWA and security metadata again.
+Page-specific generated metadata:
+
+- title
+- description
+- Open Graph title and description
+- Twitter title and description
+
+The Vite build inputs are derived from the same page registry, so adding a new HTML entry should start in `site.config.mjs`.
 
 The body contains only two user-facing sections:
 
@@ -223,11 +233,11 @@ Vite writes the deployable site to `dist/`. That output contains the app shell, 
 
 `references/`, `test/`, `scripts/`, and `src/` are not publishable production artifacts. `test/build.test.js` checks that those directories are absent from `dist/`.
 
-Build-step follow-ups:
+Build-step details:
 
-- Generate shared HTML head metadata from one Vite-side source, while keeping page-specific title and description overrides per HTML entry.
-- Consider deriving `build.rollupOptions.input` from the same page registry used for metadata so new pages have one source of truth.
-- Avoid CSP drift between HTML and deploy headers. The same CSP currently appears in page-level meta tags and in `netlify.toml`; either generate both from one constant or treat the Netlify header as the production authority and add a build/test assertion for alignment.
+- `vite.config.mjs` uses `transformIndexHtml` to inject shared and page-specific head metadata from `site.config.mjs`.
+- `vite.config.mjs` derives `build.rollupOptions.input` from the same page registry used for metadata.
+- `test/build.test.js` verifies that built HTML pages receive generated metadata, that the source marker is removed from `dist/`, that the stylesheet is fingerprinted, and that the Netlify CSP header remains aligned with the shared CSP string from `site.config.mjs`.
 
 ### `src/sw-template.js` and `dist/sw.js`
 
@@ -266,7 +276,7 @@ Current security-relevant measures in the codebase:
 - user content is rendered through safe DOM APIs
 - external links use `noopener noreferrer`
 - CSP disallows remote scripts, objects, and forms
-- the CSP is duplicated as HTML meta policy and Netlify response header, so future changes should keep those sources synchronized or consolidate the policy into one build-time source
+- the HTML CSP meta tag is generated from `site.config.mjs`, and `test/build.test.js` asserts the Netlify response header matches the same policy string
 - the service worker only writes successful same-origin GET responses into cache
 
 ## Validation status and gaps
@@ -277,7 +287,7 @@ Current automated coverage:
 - settings storage and domain-only settings behavior in [`../test/storage.test.js`](../test/storage.test.js)
 - settings page controller behavior, including settings-read fallback and loading-state clearing, in [`../test/settings.test.js`](../test/settings.test.js)
 - import safety, startup history loading, history expiry pruning, history de-duplication, clipboard URL/text cleaning, responsive history ordering, and PWA update button states for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
-- build output and generated service worker checks in [`../test/build.test.js`](../test/build.test.js)
+- build output, generated service worker, generated HTML head metadata, and Netlify CSP alignment checks in [`../test/build.test.js`](../test/build.test.js)
 
 Current gaps:
 

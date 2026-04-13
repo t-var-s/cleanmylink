@@ -209,6 +209,23 @@ automated:
       - generated sw.js includes the settings page and settings entry
       - generated sw.js does not include unreplaced placeholders
 
+  - id: build-generates-page-head-metadata
+    type: build
+    file: test/build.test.js
+    command: npm test
+    covers:
+      - built HTML pages receive shared head metadata from the Vite page registry
+      - built HTML pages receive page-specific title and description metadata
+      - built HTML pages do not contain the source app-head marker
+      - built HTML pages use Vite-fingerprinted stylesheet assets
+
+  - id: build-netlify-csp-alignment
+    type: build
+    file: test/build.test.js
+    command: npm test
+    covers:
+      - the Netlify Content-Security-Policy response header matches the shared app CSP policy string
+
 manual_verified:
   - id: browser-clean-url-success
     type: browser
