@@ -76,10 +76,22 @@ body {
   place-items: center;
   width: 4.35rem;
   height: 4.35rem;
-  border: 0;
+  border: 2px solid rgba(255, 255, 255, 0.82);
+  border-bottom-width: 4px;
+  border-bottom-color: rgba(8, 23, 35, 0.68);
   border-radius: 4px;
-  background: transparent;
-  color: var(--text);
+  background: linear-gradient(180deg, #a9ddff 0%, #7cc7ff 54%, #57a9e1 100%);
+  color: var(--accent-ink);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 10px 18px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  transition:
+    transform 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease;
 }
 
 .settings-link {
@@ -104,15 +116,29 @@ body {
 .settings-link img,
 .settings-save-button img {
   display: block;
-  width: 4.35rem;
-  height: 4.35rem;
-  border-radius: 4px;
+  width: 100%;
+  height: 100%;
+  border-radius: 1px;
+  object-fit: cover;
+}
+
+.settings-link:active,
+.settings-save-button:active:not(:disabled) {
+  transform: translateY(1px);
+  border-bottom-color: rgba(8, 23, 35, 0.78);
+  background: linear-gradient(180deg, #9bd4fa 0%, #71bae8 54%, #4d98d0 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 6px 12px rgba(0, 0, 0, 0.16);
 }
 
 .settings-link:focus-visible,
 .settings-save-button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--focus);
+  box-shadow:
+    0 0 0 3px var(--focus),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 10px 18px rgba(0, 0, 0, 0.18);
 }
 
 .app-shell {
@@ -603,6 +629,14 @@ body {
       0 12px 20px rgba(0, 0, 0, 0.2);
   }
 
+  .settings-link:hover,
+  .settings-save-button:hover:not([disabled]) {
+    background: linear-gradient(180deg, #b4e1ff 0%, #86ceff 54%, #62b2e7 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.34),
+      0 12px 20px rgba(0, 0, 0, 0.2);
+  }
+
   .history-link:hover {
     transform: translateY(-1px);
     border-color: var(--line-strong);
@@ -612,7 +646,6 @@ body {
     box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
   }
 
-  .settings-link:hover,
   .settings-toggle:hover {
     border-color: var(--line-strong);
   }
