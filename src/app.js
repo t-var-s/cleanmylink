@@ -44,8 +44,7 @@ export function createApp({
       heroStage: documentObject.querySelector(".hero-stage"),
       historySection: documentObject.querySelector(".history-section"),
       historyList: documentObject.querySelector("#history-list"),
-      historyEmpty: documentObject.querySelector("#history-empty"),
-      historySummary: documentObject.querySelector("#history-summary")
+      historyEmpty: documentObject.querySelector("#history-empty")
     },
 
     state: {
@@ -55,7 +54,6 @@ export function createApp({
       buttonMode: "clean",
       pwaRegistration: null,
       isReloadingForUpdate: false,
-      isHistoryLoading: true,
       historyEntries: [],
       enabledTransforms: sharedTransforms.defaultEnabledTransforms
     },
@@ -246,7 +244,6 @@ export function createApp({
           : "No links cleaned yet.";
         app.elements.historyEmpty.hidden = entries.length > 0;
         app.elements.historyEmpty.removeAttribute("aria-busy");
-        app.ui.setHistorySummary(entries.length);
 
         for (const entry of orderedEntries) {
           const item = documentObject.createElement("li");
@@ -288,19 +285,7 @@ export function createApp({
         });
       },
 
-      setHistorySummary(count) {
-        if (!app.elements.historySummary) {
-          return;
-        }
-
-        app.elements.historySummary.textContent = count > 0
-          ? `${count} saved in the last 72 hours`
-          : "Saved for 72 hours on this device.";
-      },
-
       setHistoryLoading(isLoading) {
-        app.state.isHistoryLoading = isLoading;
-
         if (!app.elements.historyEmpty) {
           return;
         }

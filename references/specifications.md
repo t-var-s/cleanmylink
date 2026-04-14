@@ -32,8 +32,6 @@ Status outcomes:
 - Clipboard permission denied: `Clipboard access is blocked. Try allowing clipboard permissions.`
 - Unexpected failure: `Something went sideways while cleaning your clipboard.`
 
-The success burst animation only runs when clipboard text was actually present.
-
 ## Clipboard transformation rules
 
 ### URL detection
@@ -96,8 +94,7 @@ Example:
 ## History behavior
 
 - Only cleaned HTTP(S) URLs are stored in history.
-- History is saved in `localStorage`.
-- Entries are stored under the `clean-my-link-history` key.
+- History is saved locally on the user's device.
 - Entries expire after 72 hours.
 - Invalid or expired entries are discarded before rendering.
 - Duplicate URLs are de-duplicated so the newest clean wins.
@@ -106,7 +103,7 @@ Example:
 
 Ordering rules:
 
-- Storage order is newest first.
+- Saved order is newest first.
 - Desktop UI renders newest first.
 - Mobile UI renders the same data in reverse order and scrolls to the bottom so the newest entry sits closest to the action area.
 
@@ -115,6 +112,7 @@ Ordering rules:
 - Mobile-first presentation is the default.
 - On small screens, the hero panel stays fixed near the bottom and the history list scrolls behind it.
 - At `960px` and above, the app switches to a two-column desktop layout with history on the left and the primary action panel on the right.
+- The settings shortcut sits in the top-right corner on mobile and in the bottom-right corner on desktop.
 - The design uses a restrained dark palette with a cool blue accent and a subtle grid background.
 - Hover is optional; the core interaction must still feel responsive on touch devices.
 - Reduced-motion users should not get animated transitions.

@@ -43,6 +43,14 @@ automated:
     covers:
       - malformed domain settings storage falls back to default-enabled site rules
 
+  - id: storage-domain-settings-defaults
+    type: unit
+    file: test/storage.test.js
+    command: npm test
+    covers:
+      - missing domain transform ids fall back to default-enabled site rules
+      - invalid non-boolean domain transform values fall back to defaults
+
   - id: transforms-disabled-tracking-params
     type: unit
     file: test/transforms.test.js
@@ -133,6 +141,14 @@ automated:
       - app keeps the saved-links loading copy visible until history storage resolves
       - app clears the history loading busy state after startup history loading completes
 
+  - id: app-history-read-fallback
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - app falls back to an empty in-memory history when saved history cannot be read
+      - app logs history storage read failures without breaking startup
+
   - id: app-history-pruning
     type: unit
     file: test/app.test.js
@@ -150,6 +166,14 @@ automated:
       - app de-duplicates saved URLs so the newest clean wins
       - app ignores unsafe URLs when saving history
 
+  - id: app-history-limit
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - app caps saved history at 100 entries
+      - saving a new URL pushes the oldest over-limit history entry out of storage
+
   - id: app-clipboard-cleaning
     type: unit
     file: test/app.test.js
@@ -160,6 +184,15 @@ automated:
       - app saves cleaned URL results to history
       - app writes cleaned plain-text output back to the clipboard
       - app does not save plain-text results to history
+
+  - id: app-clipboard-edge-states
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - unchanged valid URL input still reports "All clear!"
+      - unexpected clipboard failures report the generic failure message
+      - the primary button is restored after an unexpected clipboard failure
 
   - id: app-history-responsive-ordering
     type: unit
@@ -316,7 +349,8 @@ manual_verified:
     expected:
       - toggle text fits without overflow
       - the save label fits beside the square save icon button
-      - the settings icon stays in the top-right corner without blocking primary controls
+      - the settings icon stays in the top-right corner on mobile without blocking primary controls
+      - the settings icon stays in the bottom-right corner on desktop without blocking primary controls
 
   - id: browser-history-layout-ordering
     type: browser
@@ -374,3 +408,4 @@ manual_verified:
 gaps:
   - clipboard permission-denied handling is still covered by manual browser verification rather than automated browser tests
   - service worker registration, update lifecycle, and offline cache reuse are still covered by manual browser verification rather than automated browser tests
+  - reduced-motion behavior is still covered by CSS review rather than automated browser tests

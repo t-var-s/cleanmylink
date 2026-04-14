@@ -17,6 +17,7 @@ class FakeElement {
     this.attributes = new Map();
     this.children = [];
     this.classes = new Set();
+    this.listeners = new Map();
     this.classList = {
       toggle: (className, force) => {
         const shouldAdd = force === undefined
@@ -44,7 +45,18 @@ class FakeElement {
     this.children.push(...children);
   }
 
-  addEventListener() {}
+  addEventListener(type, handler) {
+    const handlers = this.listeners.get(type) || [];
+    handlers.push(handler);
+    this.listeners.set(type, handlers);
+  }
+
+  async dispatchEvent(event) {
+    event.target ||= this;
+    for (const handler of this.listeners.get(event.type) || []) {
+      await handler(event);
+    }
+  }
 
   getBoundingClientRect() {
     return { height: 0 };
@@ -166,8 +178,7 @@ function createAppDocument() {
     ".hero-stage": new FakeElement(),
     ".history-section": new FakeElement(),
     "#history-list": new FakeElement(),
-    "#history-empty": new FakeElement(),
-    "#history-summary": new FakeElement()
+    "#history-empty": new FakeElement()
   };
 
   return {
@@ -272,6 +283,23 @@ test("app drops expired and unsafe history entries during startup", async () => 
   assert.deepEqual(errors, []);
 });
 
+test("app falls back to empty history when saved history cannot be read", async () => {
+  const { app, historyWrites, errors } = createHarness({
+    storageOverrides: {
+      async readHistoryEntries() {
+        throw new SyntaxError("malformed history storage");
+      }
+    }
+  });
+
+  await app.init();
+
+  assert.deepEqual(app.state.historyEntries, []);
+  assert.deepEqual(historyWrites, []);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0][0], /History storage read failed/);
+});
+
 test("app de-duplicates saved URLs and ignores unsafe history URLs", async () => {
   const existingEntry = {
     url: "https://example.com/path",
@@ -287,6 +315,24 @@ test("app de-duplicates saved URLs and ignores unsafe history URLs", async () =>
   assert.equal(app.state.historyEntries[0].url, "https://example.com/path");
   assert.ok(app.state.historyEntries[0].timestamp >= existingEntry.timestamp);
   assert.equal(historyWrites.length, 1);
+  assert.deepEqual(historyWrites[0], app.state.historyEntries);
+});
+
+test("app caps saved history at the configured limit", async () => {
+  const { app, historyWrites } = createHarness();
+  app.state.historyEntries = Array.from({ length: 100 }, (_, index) => ({
+    url: `https://example.com/${index}`,
+    timestamp: Date.now() - index
+  }));
+
+  await app.history.save("https://example.com/new");
+
+  assert.equal(app.state.historyEntries.length, 100);
+  assert.equal(app.state.historyEntries[0].url, "https://example.com/new");
+  assert.equal(
+    app.state.historyEntries.some((entry) => entry.url === "https://example.com/99"),
+    false
+  );
   assert.deepEqual(historyWrites[0], app.state.historyEntries);
 });
 
@@ -309,6 +355,21 @@ test("app cleans clipboard URLs with domain settings and saves only URL results"
   assert.equal(historyWrites.length, 1);
 });
 
+test("app reports unchanged valid URLs as successful clipboard cleans", async () => {
+  const { app, clipboardWrites, historyWrites, documentObject } = createHarness({
+    clipboardText: "https://example.com/path?keep=ok"
+  });
+
+  await app.init();
+  const result = await app.clipboard.cleanLatest();
+
+  assert.equal(result.changed, false);
+  assert.equal(result.output, "https://example.com/path?keep=ok");
+  assert.deepEqual(clipboardWrites, ["https://example.com/path?keep=ok"]);
+  assert.equal(documentObject.querySelector("#status-message").textContent, "All clear!");
+  assert.equal(historyWrites.length, 1);
+});
+
 test("app cleans clipboard text without saving it to URL history", async () => {
   const { app, clipboardWrites, historyWrites } = createHarness({
     clipboardText: "HELLO   WORLD.\nTHIS IS FINE."
@@ -322,6 +383,30 @@ test("app cleans clipboard text without saving it to URL history", async () => {
   assert.deepEqual(clipboardWrites, ["Hello world. This is fine."]);
   assert.deepEqual(app.state.historyEntries, []);
   assert.deepEqual(historyWrites, []);
+});
+
+test("app reports unexpected clipboard failures and restores the primary button", async () => {
+  const { app, documentObject, errors } = createHarness({
+    navigatorOverrides: {
+      clipboard: {
+        async readText() {
+          throw new Error("clipboard exploded");
+        }
+      }
+    }
+  });
+
+  await app.init();
+  await documentObject.querySelector("#clean-button").dispatchEvent({
+    type: "click"
+  });
+
+  assert.equal(
+    documentObject.querySelector("#status-message").textContent,
+    "Something went sideways while cleaning your clipboard."
+  );
+  assert.equal(documentObject.querySelector("#clean-button").disabled, false);
+  assert.equal(errors.length, 1);
 });
 
 test("app renders history newest-first on desktop and newest-near-action on mobile", async () => {

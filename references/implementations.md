@@ -203,7 +203,7 @@ The body contains only two user-facing sections:
 - hero/action panel
 - recent-links panel
 
-It also includes a top-right settings link using `/assets/icon_settings.webp`.
+It also includes a settings link using `/assets/icon_settings.webp`; the link is positioned top-right on mobile and bottom-right on desktop.
 
 ### `src/styles.css`
 
@@ -284,15 +284,16 @@ Current security-relevant measures in the codebase:
 Current automated coverage:
 
 - transform behavior in [`../test/transforms.test.js`](../test/transforms.test.js)
-- settings storage and domain-only settings behavior in [`../test/storage.test.js`](../test/storage.test.js)
+- settings storage, domain-only settings behavior, and transform-setting default normalization in [`../test/storage.test.js`](../test/storage.test.js)
 - settings page controller behavior, including settings-read fallback and loading-state clearing, in [`../test/settings.test.js`](../test/settings.test.js)
-- import safety, startup history loading, history expiry pruning, history de-duplication, clipboard URL/text cleaning, responsive history ordering, and PWA update button states for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
+- import safety, startup history loading, malformed history fallback, history expiry pruning, history de-duplication, history limit enforcement, clipboard URL/text cleaning, unchanged-input status, unexpected clipboard failure handling, responsive history ordering, and PWA update button states for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
 - build output, generated service worker, generated HTML head metadata, and Netlify CSP alignment checks in [`../test/build.test.js`](../test/build.test.js)
 
 Current gaps:
 
 - no automated browser test for clipboard permission states
 - no automated browser test for service worker registration, update lifecycle, or offline cache reuse
+- no automated browser test for reduced-motion behavior
 
 ## Local development
 

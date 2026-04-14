@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { createStorageAdapter } from "../src/storage.js";
 import {
   composeEnabledTransforms,
+  normalizeDomainTransformSettings,
   transformSettingsStorageKey
 } from "../src/settings-storage.js";
 import { siteRules } from "../src/transforms.js";
@@ -67,5 +68,21 @@ test("domain settings recover from malformed storage", async () => {
   assert.deepEqual(
     await storage.readDomainTransformSettings(),
     Object.fromEntries(siteRules.map((definition) => [definition.id, definition.defaultEnabled]))
+  );
+});
+
+test("domain settings fill missing and invalid transform ids with defaults", () => {
+  assert.deepEqual(
+    normalizeDomainTransformSettings({
+      enabledTransforms: {
+        "rewrite-x-to-fxtwitter": false,
+        "rewrite-reddit-to-redlib": "nope"
+      }
+    }),
+    {
+      "rewrite-x-to-fxtwitter": false,
+      "rewrite-reddit-to-redlib": true,
+      "keep-youtube-video-id": true
+    }
   );
 });

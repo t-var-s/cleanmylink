@@ -380,7 +380,6 @@ body {
   line-height: 1.1;
 }
 
-.history-summary,
 .history-empty,
 .history-meta {
   margin: 0;
@@ -696,10 +695,6 @@ body {
     max-width: none;
   }
 
-  .history-summary {
-    text-align: right;
-    max-width: 18ch;
-  }
 }
 
 @media (min-width: 700px) {
