@@ -2,14 +2,14 @@
 
 This is a static client-side app with a Vite build step and no backend. The source runtime remains plain HTML, CSS, and browser JavaScript; Vite bundles the browser entry and writes the deployable site to `dist/`.
 
-Verified on April 13, 2026:
+Verified on April 15, 2026:
 
 - `npm test` passes
 - `npm run build` writes the deploy artifact to `dist/`
 - `dist/` excludes source-only directories such as `references/`, `test/`, `scripts/`, and `src/`
 - the app runs locally from the Vite dev server and Vite preview server
 - the main clipboard flow works in-browser when clipboard permissions are granted
-- the blocked-permission path, empty-clipboard path, text-cleaning path, URL-cleaning path, history rendering, startup storage loading states, service worker registration, and manifest availability were all checked in a local browser session
+- the blocked-permission path, empty-clipboard path, text-cleaning path, URL-cleaning path, history rendering, startup storage loading states, service worker registration, manifest availability, IndexedDB persistence, settings persistence, and localStorage migration were all checked in a local browser session
 
 ## File map
 
@@ -99,6 +99,8 @@ The app object is organized with grouped concerns:
 Important behavior in the current implementation:
 
 - Local history key: `clean-my-link-history`
+- IndexedDB database: `clean-my-link-storage`
+- IndexedDB object store: `keyval`
 - History TTL: `72 * 60 * 60 * 1000`
 - History limit: `100`
 - Desktop breakpoint: `960`
@@ -108,10 +110,12 @@ Important behavior in the current implementation:
 History handling:
 
 - Storage access goes through async `storage.readHistoryEntries()` and `storage.writeHistoryEntries()` methods.
-- Storage access goes through the shared async adapter in `src/storage.js`; the backing store is currently `localStorage`, leaving room for IndexedDB or encrypted storage later.
+- Storage access goes through the shared async adapter in `src/storage.js`; the default backing store is IndexedDB via `idb`.
+- Existing `localStorage` values are copied into IndexedDB on first missing read and left in place for rollback.
+- If IndexedDB cannot open or a write fails, the adapter falls back to the localStorage-compatible implementation.
 - History entries are loaded into `state.historyEntries` during app startup.
 - Rendering reads from in-memory state instead of reading storage directly.
-- History loading is wrapped in `try/catch` so malformed local storage does not break the app.
+- History loading is wrapped in `try/catch` so malformed local storage or IndexedDB data does not break the app.
 - Startup sets the history empty slot to `Loading saved links from this device...` with `aria-busy="true"` while the async history read is pending.
 - The history loading state is cleared and the history panel is rendered as soon as `readHistoryEntries()` settles, before transform settings and service-worker update checks continue.
 - Persisted entries are re-validated before use.
@@ -169,6 +173,7 @@ Settings storage:
 - Storage key: `clean-my-link-transform-settings`
 - Stored shape: `{ version: 1, enabledTransforms: { [transformId]: boolean } }`
 - Only site-rule transform IDs are serialized; any global cleanup IDs are ignored by normalization.
+- Settings use the same IndexedDB key/value store, copy-and-keep localStorage migration, and localStorage fallback path as history.
 
 Localhost development helper:
 

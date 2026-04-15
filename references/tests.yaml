@@ -1,5 +1,5 @@
 version: 1
-verified_on: 2026-04-13
+verified_on: 2026-04-15
 
 automated:
   - id: transforms-tracking-params
@@ -50,6 +50,32 @@ automated:
     covers:
       - missing domain transform ids fall back to default-enabled site rules
       - invalid non-boolean domain transform values fall back to defaults
+
+  - id: storage-indexeddb-adapter
+    type: unit
+    file: test/storage.test.js
+    command: npm test
+    covers:
+      - IndexedDB-backed storage persists history entries
+      - IndexedDB-backed storage persists domain transform settings
+      - IndexedDB-backed domain settings serialize only site-rule transform ids
+
+  - id: storage-indexeddb-migration
+    type: unit
+    file: test/storage.test.js
+    command: npm test
+    covers:
+      - missing IndexedDB history is copied from localStorage and returned
+      - missing IndexedDB domain settings are copied from localStorage and returned
+      - existing IndexedDB values take precedence over localStorage migration values
+      - localStorage migration values are left in place after copy
+
+  - id: storage-indexeddb-fallback
+    type: unit
+    file: test/storage.test.js
+    command: npm test
+    covers:
+      - localStorage-compatible storage is used when IndexedDB cannot open
 
   - id: transforms-disabled-tracking-params
     type: unit
