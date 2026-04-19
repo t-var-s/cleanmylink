@@ -17,6 +17,7 @@ node_modules/
 # Local AI assistant/project metadata
 .agents/
 .claude/
+references/plans/
 skills-lock.json
 
 #editors
