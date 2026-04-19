@@ -121,6 +121,36 @@ export function createApp({
       }
     },
 
+    sharing: {
+      buildShareData(entry) {
+        return {
+          url: entry.url
+        };
+      },
+
+      canShareEntry(entry) {
+        if (typeof navigatorObject.share !== "function") {
+          return false;
+        }
+
+        const shareData = app.sharing.buildShareData(entry);
+        if (typeof navigatorObject.canShare !== "function") {
+          return true;
+        }
+
+        try {
+          return navigatorObject.canShare(shareData);
+        } catch (error) {
+          consoleObject.error("History link share availability check failed", error);
+          return false;
+        }
+      },
+
+      async shareEntry(entry) {
+        await navigatorObject.share(app.sharing.buildShareData(entry));
+      }
+    },
+
     layout: {
       isDesktop() {
         return windowObject.innerWidth >= app.config.desktopBreakpoint;
@@ -254,6 +284,20 @@ export function createApp({
           link.href = entry.url;
           link.target = "_blank";
           link.rel = "noopener noreferrer";
+
+          if (app.sharing.canShareEntry(entry)) {
+            link.addEventListener("click", async (event) => {
+              event.preventDefault();
+
+              try {
+                await app.sharing.shareEntry(entry);
+              } catch (error) {
+                if (error?.name !== "AbortError") {
+                  consoleObject.error("History link share failed", error);
+                }
+              }
+            });
+          }
 
           const urlText = documentObject.createElement("span");
           urlText.className = "history-url";

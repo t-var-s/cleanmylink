@@ -89,6 +89,7 @@ The app object is organized with grouped concerns:
 - `state`
 - `storage`
 - `history`
+- `sharing`
 - `layout`
 - `ui`
 - `clipboard`
@@ -128,7 +129,10 @@ Rendering and safety:
 
 - History items are built with `createElement` and `textContent`.
 - User-controlled content is never interpolated with `innerHTML`.
-- External links are rendered with `target="_blank"` and `rel="noopener noreferrer"`.
+- History items remain external links rendered with `target="_blank"` and `rel="noopener noreferrer"`.
+- When the Web Share API is available for a saved entry, tapping that saved item shares entry-derived data instead of opening a new tab.
+- The current share payload is URL-only, built from the saved entry as `{ url: entry.url }`, so future entry metadata can enrich the share data without changing the history rendering flow.
+- User-cancelled shares are ignored; unexpected share errors are logged without changing the app status.
 
 Responsive behavior:
 
@@ -291,7 +295,7 @@ Current automated coverage:
 - transform behavior in [`../test/transforms.test.js`](../test/transforms.test.js)
 - settings storage, domain-only settings behavior, and transform-setting default normalization in [`../test/storage.test.js`](../test/storage.test.js)
 - settings page controller behavior, including settings-read fallback and loading-state clearing, in [`../test/settings.test.js`](../test/settings.test.js)
-- import safety, startup history loading, malformed history fallback, history expiry pruning, history de-duplication, history limit enforcement, clipboard URL/text cleaning, unchanged-input status, unexpected clipboard failure handling, responsive history ordering, and PWA update button states for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
+- import safety, startup history loading, malformed history fallback, history expiry pruning, history de-duplication, history limit enforcement, clipboard URL/text cleaning, unchanged-input status, unexpected clipboard failure handling, responsive history ordering, saved-link share/fallback behavior, and PWA update button states for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
 - build output, generated service worker, generated HTML head metadata, and Netlify CSP alignment checks in [`../test/build.test.js`](../test/build.test.js)
 
 Current gaps:

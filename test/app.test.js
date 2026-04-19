@@ -440,6 +440,129 @@ test("app renders history newest-first on desktop and newest-near-action on mobi
   );
 });
 
+test("app shares saved history entries when the Web Share API can share them", async () => {
+  const entry = {
+    url: "https://example.com/shared",
+    timestamp: Date.now()
+  };
+  const shareCalls = [];
+  const canShareCalls = [];
+  const { app, documentObject } = createHarness({
+    historyEntries: [entry],
+    navigatorOverrides: {
+      canShare(data) {
+        canShareCalls.push(data);
+        return true;
+      },
+
+      async share(data) {
+        shareCalls.push(data);
+      }
+    }
+  });
+  let preventedDefault = false;
+
+  await app.init();
+  const link = documentObject.querySelector("#history-list").children[0].children[0];
+  await link.dispatchEvent({
+    type: "click",
+    preventDefault() {
+      preventedDefault = true;
+    }
+  });
+
+  assert.equal(preventedDefault, true);
+  assert.deepEqual(canShareCalls, [{ url: entry.url }]);
+  assert.deepEqual(shareCalls, [{ url: entry.url }]);
+  assert.equal(link.href, entry.url);
+  assert.equal(link.target, "_blank");
+  assert.equal(link.rel, "noopener noreferrer");
+});
+
+test("app leaves saved history links as safe external links when sharing is unavailable", async () => {
+  const entry = {
+    url: "https://example.com/fallback",
+    timestamp: Date.now()
+  };
+  const { app, documentObject } = createHarness({
+    historyEntries: [entry]
+  });
+  let preventedDefault = false;
+
+  await app.init();
+  const link = documentObject.querySelector("#history-list").children[0].children[0];
+  await link.dispatchEvent({
+    type: "click",
+    preventDefault() {
+      preventedDefault = true;
+    }
+  });
+
+  assert.equal(preventedDefault, false);
+  assert.equal(link.href, entry.url);
+  assert.equal(link.target, "_blank");
+  assert.equal(link.rel, "noopener noreferrer");
+});
+
+test("app falls back to saved history links when Web Share cannot share an entry", async () => {
+  const entry = {
+    url: "https://example.com/cannot-share",
+    timestamp: Date.now()
+  };
+  const shareCalls = [];
+  const { app, documentObject } = createHarness({
+    historyEntries: [entry],
+    navigatorOverrides: {
+      canShare() {
+        return false;
+      },
+
+      async share(data) {
+        shareCalls.push(data);
+      }
+    }
+  });
+  let preventedDefault = false;
+
+  await app.init();
+  const link = documentObject.querySelector("#history-list").children[0].children[0];
+  await link.dispatchEvent({
+    type: "click",
+    preventDefault() {
+      preventedDefault = true;
+    }
+  });
+
+  assert.equal(preventedDefault, false);
+  assert.deepEqual(shareCalls, []);
+});
+
+test("app ignores user-cancelled saved history shares", async () => {
+  const entry = {
+    url: "https://example.com/cancelled-share",
+    timestamp: Date.now()
+  };
+  const abortError = new Error("share cancelled");
+  abortError.name = "AbortError";
+  const { app, documentObject, errors } = createHarness({
+    historyEntries: [entry],
+    navigatorOverrides: {
+      async share() {
+        throw abortError;
+      }
+    }
+  });
+
+  await app.init();
+  const link = documentObject.querySelector("#history-list").children[0].children[0];
+  await link.dispatchEvent({
+    type: "click",
+    preventDefault() {}
+  });
+
+  assert.deepEqual(errors, []);
+});
+
 test("app switches PWA update actions between offline retry and online activation", async () => {
   const postedMessages = [];
   const registration = {

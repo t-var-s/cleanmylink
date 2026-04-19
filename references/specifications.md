@@ -99,7 +99,7 @@ Example:
 - Invalid or expired entries are discarded before rendering.
 - Duplicate URLs are de-duplicated so the newest clean wins.
 - History is capped at 100 entries.
-- Each item opens in a new tab with safe external-link attributes.
+- Each item opens in a new tab with safe external-link attributes if a share API isn't available. The link is shared otherwise.
 
 Ordering rules:
 

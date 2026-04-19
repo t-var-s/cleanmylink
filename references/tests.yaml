@@ -228,6 +228,17 @@ automated:
       - desktop history renders newest entries first
       - mobile history renders older entries above newer entries so the newest is closest to the action area
 
+  - id: app-history-share-actions
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - saved history entries call navigator.share with entry-derived URL data when the Web Share API can share them
+      - saved history entries keep safe external-link attributes even when sharing is available
+      - saved history links keep normal navigation behavior when the Web Share API is unavailable
+      - saved history links keep normal navigation behavior when navigator.canShare rejects the entry payload
+      - user-cancelled saved history shares are ignored without app errors
+
   - id: app-pwa-update-actions
     type: unit
     file: test/app.test.js
@@ -400,10 +411,25 @@ manual_verified:
       - grant clipboard-read and clipboard-write permissions
       - create at least one history entry
     steps:
-      - inspect a rendered history link
+      - use a browser where the Web Share API is unavailable for the saved link
+      - inspect and tap a rendered history link
     expected:
       - target is "_blank"
       - rel is "noopener noreferrer"
+      - the saved link opens in a new tab
+
+  - id: browser-history-share-api
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run start on a browser or device with Web Share API support
+      - grant clipboard-read and clipboard-write permissions
+      - create at least one history entry
+    steps:
+      - tap a rendered history link
+    expected:
+      - the saved link opens the native share sheet instead of a new tab
+      - the shared payload contains the saved URL
 
   - id: browser-blocked-clipboard-state
     type: browser
