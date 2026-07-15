@@ -385,6 +385,29 @@ test("app cleans clipboard text without saving it to URL history", async () => {
   assert.deepEqual(historyWrites, []);
 });
 
+test("app starts clipboard reads from the click before disabling the primary button", async () => {
+  let button;
+  let readCalls = 0;
+  const { app, documentObject } = createHarness({
+    navigatorOverrides: {
+      clipboard: {
+        async readText() {
+          readCalls += 1;
+          assert.equal(button.disabled, false);
+          return "";
+        }
+      }
+    }
+  });
+
+  button = documentObject.querySelector("#clean-button");
+  await app.init();
+  await button.dispatchEvent({ type: "click" });
+
+  assert.equal(readCalls, 1);
+  assert.equal(button.disabled, false);
+});
+
 test("app reports unexpected clipboard failures and restores the primary button", async () => {
   const { app, documentObject, errors } = createHarness({
     navigatorOverrides: {

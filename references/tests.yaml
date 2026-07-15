@@ -217,6 +217,7 @@ automated:
     command: npm test
     covers:
       - unchanged valid URL input still reports "All clear!"
+      - clicking the primary action starts the clipboard read before disabling the button
       - unexpected clipboard failures report the generic failure message
       - the primary button is restored after an unexpected clipboard failure
 
@@ -442,6 +443,21 @@ manual_verified:
     expected:
       - status becomes "Clipboard access is blocked. Try allowing clipboard permissions."
 
+  - id: browser-safari-clipboard-activation
+    type: browser
+    tool: manual Safari verification
+    setup:
+      - open the HTTPS deployment in Safari on iOS or macOS without pre-granting clipboard access
+      - copy a URL from another app or origin
+    steps:
+      - click "Clean My Copied Link"
+      - confirm Safari immediately presents its native Paste control
+      - choose Paste
+    expected:
+      - the clipboard read is accepted as part of the primary-action user activation
+      - the URL is cleaned and written back to the clipboard
+      - status becomes "All clear!"
+
   - id: browser-pwa-basics
     type: browser
     tool: playwright-cli
@@ -458,6 +474,7 @@ manual_verified:
       - manifest.webmanifest responds with HTTP 200
 
 gaps:
+  - Safari's native Paste control and transient clipboard activation require manual verification because the browser-owned UI is not exposed to the current automation harness
   - clipboard permission-denied handling is still covered by manual browser verification rather than automated browser tests
   - service worker registration, update lifecycle, and offline cache reuse are still covered by manual browser verification rather than automated browser tests
   - reduced-motion behavior is still covered by CSS review rather than automated browser tests

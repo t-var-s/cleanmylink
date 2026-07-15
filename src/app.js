@@ -232,14 +232,6 @@ export function createApp({
         app.elements.button.toggleAttribute("aria-busy", isLoading);
       },
 
-      waitForNextPaint() {
-        return new Promise((resolve) => {
-          windowObject.requestAnimationFrame(() => {
-            windowObject.requestAnimationFrame(resolve);
-          });
-        });
-      },
-
       setPrimaryActionMode(mode) {
         app.state.buttonMode = mode;
 
@@ -346,8 +338,8 @@ export function createApp({
     },
 
     clipboard: {
-      async cleanLatest() {
-        const clipboardText = await navigatorObject.clipboard.readText();
+      async cleanLatest(clipboardTextPromise = navigatorObject.clipboard.readText()) {
+        const clipboardText = await clipboardTextPromise;
         if (!clipboardText.trim()) {
           app.ui.setStatus("empty");
           return {
@@ -522,12 +514,11 @@ export function createApp({
             return;
           }
 
-          app.ui.setStatus("loading");
-          app.ui.setButtonLoading(true);
-
           try {
-            await app.ui.waitForNextPaint();
-            await app.clipboard.cleanLatest();
+            app.ui.setStatus("loading");
+            const clipboardTextPromise = navigatorObject.clipboard.readText();
+            app.ui.setButtonLoading(true);
+            await app.clipboard.cleanLatest(clipboardTextPromise);
           } catch (error) {
             const statusKey = error?.name === "NotAllowedError" ? "blocked" : "error";
             app.ui.setStatus(statusKey);
