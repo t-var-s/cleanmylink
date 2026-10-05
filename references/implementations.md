@@ -227,6 +227,9 @@ The CSS matches the current product direction:
 - the visual order on mobile comes from `order` on `.history-section` and `.hero-stage`, so the DOM keeps the hero first
 - below `580px` the hero keeps the mobile gutters; from `580px` the `34rem` column already fits inside the viewport with its gutters, so the hero panel fills the column, which keeps the width the old fixed panel had
 - `.settings-page` and the `960px` desktop breakpoint reset `body` to `display: block`, `height: auto`, and `overflow: auto`, so the settings page and the desktop grid scroll normally
+- the history section is not an `.app-panel`; its mobile rules are its own, and the `960px` block gives it the panel border, background, shadow, blur, `1.25rem` padding, and `1.2rem` gap directly. Between `540px` and `959px` the section therefore keeps its `3.25rem` top padding, mobile gutters, and `0.9rem` gap, where the old `.app-panel` media rules used to override them
+- one `.push-button` class carries the blue gradient, border, shadow, pressed, hover, focus-visible, and disabled-cursor rules for the clean button, the settings link, and the settings save button. `.clean-button` only adds its size and typography, `.settings-link` and `.settings-save-button` only add the square icon sizing and their own positioning or disabled opacity
+- `touch-action: manipulation` is declared once on `html`; descendants inherit the effective value, so no other selector repeats it
 - two-column product layout on desktop
 - startup loading styles for storage-backed history and settings content
 - settings page styles for the domain-toggle form

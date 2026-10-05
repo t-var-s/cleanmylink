@@ -61,7 +61,6 @@ body {
   height: var(--viewport-height, 100dvh);
   margin: 0;
   overflow: hidden;
-  touch-action: manipulation;
   color: var(--text);
   font-family: var(--font-copy);
   background:
@@ -72,12 +71,7 @@ body {
   background-size: auto, 18px 18px, 18px 18px;
 }
 
-.settings-link,
-.settings-save-button {
-  display: grid;
-  place-items: center;
-  width: 4.35rem;
-  height: 4.35rem;
+.push-button {
   border: 2px solid rgba(255, 255, 255, 0.82);
   border-bottom-width: 4px;
   border-bottom-color: rgba(8, 23, 35, 0.68);
@@ -87,14 +81,43 @@ body {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.28),
     0 10px 18px rgba(0, 0, 0, 0.18);
-  overflow: hidden;
+  cursor: pointer;
   transition:
     transform 140ms ease,
     background 140ms ease,
     border-color 140ms ease,
     box-shadow 140ms ease,
     opacity 140ms ease;
-  touch-action: manipulation;
+}
+
+.push-button:active:not(:disabled) {
+  transform: translateY(1px);
+  border-bottom-color: rgba(8, 23, 35, 0.78);
+  background: linear-gradient(180deg, #9bd4fa 0%, #71bae8 54%, #4d98d0 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 6px 12px rgba(0, 0, 0, 0.16);
+}
+
+.push-button:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px var(--focus),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 10px 18px rgba(0, 0, 0, 0.18);
+}
+
+.push-button:disabled {
+  cursor: progress;
+}
+
+.settings-link,
+.settings-save-button {
+  display: grid;
+  place-items: center;
+  width: 4.35rem;
+  height: 4.35rem;
+  overflow: hidden;
 }
 
 .settings-link {
@@ -108,11 +131,9 @@ body {
 .settings-save-button {
   appearance: none;
   padding: 0;
-  cursor: pointer;
 }
 
 .settings-save-button:disabled {
-  cursor: progress;
   opacity: 0.55;
 }
 
@@ -123,25 +144,6 @@ body {
   height: 100%;
   border-radius: 1px;
   object-fit: cover;
-}
-
-.settings-link:active,
-.settings-save-button:active:not(:disabled) {
-  transform: translateY(1px);
-  border-bottom-color: rgba(8, 23, 35, 0.78);
-  background: linear-gradient(180deg, #9bd4fa 0%, #71bae8 54%, #4d98d0 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 6px 12px rgba(0, 0, 0, 0.16);
-}
-
-.settings-link:focus-visible,
-.settings-save-button:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 3px var(--focus),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    0 10px 18px rgba(0, 0, 0, 0.18);
 }
 
 .app-shell {
@@ -227,38 +229,12 @@ body {
   width: 100%;
   min-height: 3.4rem;
   padding: 1rem 1.1rem;
-  border: 2px solid rgba(255, 255, 255, 0.82);
-  border-bottom-width: 4px;
-  border-bottom-color: rgba(8, 23, 35, 0.68);
-  border-radius: 4px;
-  background: linear-gradient(180deg, #a9ddff 0%, #7cc7ff 54%, #57a9e1 100%);
-  color: var(--accent-ink);
   font-family: var(--font-accent);
   font-size: 1.08rem;
   font-weight: 400;
   line-height: 1;
   letter-spacing: 0;
   text-transform: uppercase;
-  cursor: pointer;
-  touch-action: manipulation;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    0 10px 18px rgba(0, 0, 0, 0.18);
-  transition:
-    transform 140ms ease,
-    background 140ms ease,
-    border-color 140ms ease,
-    box-shadow 140ms ease,
-    opacity 140ms ease;
-}
-
-.clean-button:active {
-  transform: translateY(1px);
-  border-bottom-color: rgba(8, 23, 35, 0.78);
-  background: linear-gradient(180deg, #9bd4fa 0%, #71bae8 54%, #4d98d0 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 6px 12px rgba(0, 0, 0, 0.16);
 }
 
 .clean-button-label {
@@ -326,14 +302,6 @@ body {
   text-decoration-color: currentColor;
 }
 
-.clean-button:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 3px var(--focus),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    0 10px 18px rgba(0, 0, 0, 0.18);
-}
-
 .history-link:focus-visible {
   outline: none;
   border-left: 2px solid var(--accent);
@@ -344,10 +312,6 @@ body {
     0 10px 22px rgba(0, 0, 0, 0.18);
 }
 
-.clean-button[disabled] {
-  cursor: progress;
-}
-
 .history-section {
   order: 1;
   display: flex;
@@ -356,14 +320,8 @@ body {
   gap: 0.9rem;
   min-height: 0;
   padding: 3.25rem var(--mobile-gutter) 1rem;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
   overflow-y: auto;
   overscroll-behavior: contain;
-  touch-action: manipulation;
 }
 
 .history-header {
@@ -411,7 +369,6 @@ body {
   padding: 0.85rem 0.9rem;
   color: var(--text);
   text-decoration: none;
-  touch-action: manipulation;
   background:
     linear-gradient(90deg, rgba(124, 199, 255, 0.08), transparent 24%),
     rgba(11, 18, 27, 0.72);
@@ -540,7 +497,6 @@ body {
   border-radius: 4px;
   background: rgba(11, 18, 27, 0.72);
   cursor: pointer;
-  touch-action: manipulation;
 }
 
 .settings-toggle-copy {
@@ -629,15 +585,7 @@ body {
 }
 
 @media (hover: hover) {
-  .clean-button:hover:not([disabled]) {
-    background: linear-gradient(180deg, #b4e1ff 0%, #86ceff 54%, #62b2e7 100%);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.34),
-      0 12px 20px rgba(0, 0, 0, 0.2);
-  }
-
-  .settings-link:hover,
-  .settings-save-button:hover:not([disabled]) {
+  .push-button:hover:not(:disabled) {
     background: linear-gradient(180deg, #b4e1ff 0%, #86ceff 54%, #62b2e7 100%);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.34),
@@ -758,6 +706,7 @@ body {
     justify-self: end;
     width: 100%;
     max-width: var(--desktop-history-width);
+    gap: 1.2rem;
     height: auto;
     min-height: auto;
     padding: 1.25rem;

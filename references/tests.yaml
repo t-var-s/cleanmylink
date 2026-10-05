@@ -394,11 +394,14 @@ manual_verified:
       - review the settings page at a mobile viewport around 390x844
       - review the settings page at a desktop viewport around 1440x900
       - review the main page at the same mobile and desktop viewports
+      - review the main page at a tablet viewport around 760x900
     expected:
       - toggle text fits without overflow
       - the save label fits beside the square save icon button
       - the settings icon stays in the top-right corner on mobile without blocking primary controls
       - the settings icon stays in the bottom-right corner on desktop without blocking primary controls
+      - the clean button, settings link, and settings save button share the same blue push-button look in rest, hover, pressed, focus-visible, and disabled states
+      - at the tablet viewport the history header keeps the mobile top padding below the settings icon and the hero panel fills the 34rem column
 
   - id: browser-history-layout-ordering
     type: browser
