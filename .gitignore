@@ -15,9 +15,9 @@ node_modules/
 !.env.example
 
 # Local AI assistant/project metadata
+references/plans/
 .agents/
 .claude/
-references/plans/
 skills-lock.json
 
 #editors
