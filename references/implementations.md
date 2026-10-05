@@ -108,7 +108,7 @@ Important behavior in the current implementation:
 - History limit: `100`
 - Desktop breakpoint: `960`
 - Default button mode: paste
-- Alternate button modes: clean, update, retry-update
+- Alternate button modes: clean, copy, update, retry-update
 
 History handling:
 
@@ -147,7 +147,7 @@ Responsive behavior:
 
 Input sources:
 
-All sources feed `input.clean(text, { source })`, which cleans with the enabled transforms, keeps the result in `state.lastResult`, writes it back to the clipboard, sets the status, empties and blurs the field, and saves URL results to history. Text that is empty after trimming reports the empty-clipboard status.
+All sources feed `input.clean(text, { source })`, which cleans with the enabled transforms, keeps the result in `state.lastResult`, writes it back to the clipboard through `clipboard.writeBack()`, sets the status, empties and blurs the field when the write succeeded or switches to the Copy fallback when it was refused, and saves URL results to history. Text that is empty after trimming reports the empty-clipboard status.
 
 - Paste into the field: the textarea `paste` handler reads `text/plain` from `clipboardData`, calls `preventDefault()` so nothing is inserted, and cleans. A paste always replaces the field content. Pastes without plain text keep the browser default.
 - Paste anywhere: a `document` `paste` handler cleans when the event target is not editable (`INPUT`, `TEXTAREA`, `SELECT`, or `isContentEditable`), which also leaves pastes into the main field to its own handler. Cmd+V or Ctrl+V therefore works without focusing the field.
@@ -158,7 +158,7 @@ All sources feed `input.clean(text, { source })`, which cleans with the enabled 
 
 Field state:
 
-- `.clean-stage` carries `data-state`, set through `stage.setState()`: `idle` for an empty field and `editing` for typed text.
+- `.clean-stage` carries `data-state`, set through `stage.setState()`: `idle` for an empty field, `editing` for typed text, and `done` while a refused write-back leaves the clean string in the field.
 - The form never submits natively; the CSP sets `form-action 'none'`, and the `submit` handler calls `preventDefault()`. The action button is `type="button"`.
 - The field is autofocused on load for every pointer type, unless something else already has focus, as the landing spot for a desktop paste. It is not refocused after a clean.
 - Clicking the stage outside the textarea focuses the field.
@@ -168,6 +168,10 @@ Clipboard flow:
 
 - Reads via `navigator.clipboard.readText()` on the paste button path only; paste and drop events carry their own data
 - Writes the cleaned output with `navigator.clipboard.writeText(...)` immediately after cleaning, before any other await, so it stays inside the paste or click activation
+- `clipboard.writeBack(output)` returns `{ written: true }` on success and `{ written: false }` when `writeText` rejects with `NotAllowedError` or is unavailable; any other rejection propagates to the generic error status
+- A refused write-back is not an error: the status stays `All clear!`, the clean string is put in the field and selected so a keyboard copy also works, the stage becomes `done`, and the button reads `Copy`. Paste and drop events do not always carry the activation `writeText` needs, for example Safari's Edit-menu paste or a drop from another window
+- Tapping `Copy` calls `clipboard.copyLast()`, which writes `state.lastResult.output` inside its own click activation, then empties and blurs the field and returns the button to `Paste` with the status unchanged. If that write is refused too, the button stays `Copy` and the blocked status is shown
+- Editing the field leaves Copy mode for `Clean`, Escape empties it back to `Paste`, and a new paste or drop replaces it
 - Reads domain-transform settings during app startup through `storage.readDomainTransformSettings()`, composes them with default transforms, and keeps the resulting enabled-transform map in memory for clipboard cleaning.
 - If domain-transform settings cannot be read during main-page startup, the app falls back to default transform settings and logs the storage error.
 - Shows blocked/error/empty/success status messages based on the outcome
@@ -331,7 +335,7 @@ Current automated coverage:
 - transform behavior in [`../test/transforms.test.js`](../test/transforms.test.js)
 - settings storage, domain-only settings behavior, and transform-setting default normalization in [`../test/storage.test.js`](../test/storage.test.js)
 - settings page controller behavior, including settings-read fallback and loading-state clearing, in [`../test/settings.test.js`](../test/settings.test.js)
-- import safety, startup history loading, malformed history fallback, history expiry pruning, history de-duplication, history limit enforcement, clipboard URL/text cleaning, unchanged-input status, unexpected clipboard failure handling, field and document paste, typed text with Enter and Escape, drop sources, field reset and height sync, responsive history ordering, saved-link share/fallback behavior, and PWA update button states for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
+- import safety, startup history loading, malformed history fallback, history expiry pruning, history de-duplication, history limit enforcement, clipboard URL/text cleaning, unchanged-input status, unexpected clipboard failure handling, the refused write-back Copy fallback, field and document paste, typed text with Enter and Escape, drop sources, field reset and height sync, responsive history ordering, saved-link share/fallback behavior, and PWA update button states for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
 - build output, generated service worker, generated HTML head metadata, and Netlify CSP alignment checks in [`../test/build.test.js`](../test/build.test.js)
 
 Current gaps:

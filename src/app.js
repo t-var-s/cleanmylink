@@ -26,6 +26,7 @@ export function createApp({
       defaultButtonLabel: "Paste",
       buttonLabels: {
         clean: "Clean",
+        copy: "Copy",
         update: "Update Now",
         "retry-update": "Try again"
       }
@@ -353,6 +354,35 @@ export function createApp({
     clipboard: {
       async cleanLatest(clipboardTextPromise = navigatorObject.clipboard.readText()) {
         return app.input.clean(await clipboardTextPromise, { source: "clipboard" });
+      },
+
+      async writeBack(output) {
+        if (typeof navigatorObject.clipboard?.writeText !== "function") {
+          return { written: false };
+        }
+
+        try {
+          await navigatorObject.clipboard.writeText(output);
+          return { written: true };
+        } catch (error) {
+          if (error?.name === "NotAllowedError") {
+            return { written: false };
+          }
+
+          throw error;
+        }
+      },
+
+      async copyLast() {
+        const { written } = await app.clipboard.writeBack(app.state.lastResult.output);
+
+        if (!written) {
+          app.ui.setStatus("blocked");
+          return { written };
+        }
+
+        app.input.reset({ blur: true });
+        return { written };
       }
     },
 
@@ -377,9 +407,14 @@ export function createApp({
           enabledTransforms: app.state.enabledTransforms
         });
         app.state.lastResult = { ...result, source };
-        await navigatorObject.clipboard.writeText(result.output);
+        const { written } = await app.clipboard.writeBack(result.output);
         app.ui.setStatus(result.changed ? "success" : "unchanged");
-        app.input.reset({ blur: true });
+
+        if (written) {
+          app.input.reset({ blur: true });
+        } else {
+          app.input.showCopy(result.output);
+        }
 
         if (result.isUrl) {
           await app.history.save(result.output);
@@ -388,7 +423,8 @@ export function createApp({
 
         return {
           ...result,
-          hadClipboardText: true
+          hadClipboardText: true,
+          written
         };
       },
 
@@ -546,6 +582,18 @@ export function createApp({
         const hasText = app.elements.input.value.trim() !== "";
         app.ui.setPrimaryActionMode(hasText ? "clean" : "paste");
         app.stage.setState(hasText ? "editing" : "idle");
+      },
+
+      showCopy(output) {
+        if (app.ui.isUpdateMode()) {
+          return;
+        }
+
+        app.elements.input.value = output;
+        app.input.syncHeight();
+        app.ui.setPrimaryActionMode("copy");
+        app.stage.setState("done");
+        app.elements.input.select();
       },
 
       reset({ blur = false } = {}) {
@@ -732,6 +780,11 @@ export function createApp({
 
           if (app.state.buttonMode === "clean") {
             await app.input.handleSubmit();
+            return;
+          }
+
+          if (app.state.buttonMode === "copy") {
+            await app.input.guard(() => app.clipboard.copyLast());
             return;
           }
 

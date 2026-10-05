@@ -269,6 +269,17 @@ automated:
       - after a successful clean and write-back the field is empty, no longer focused, and the button reads "Paste"
       - the paste button focuses the field when navigator.clipboard.readText is unavailable
 
+  - id: app-write-back-copy-fallback
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - writeText rejecting with NotAllowedError switches the button to "Copy" and does not show the error status
+      - after a refused write-back the field still shows the clean string, selected, and the stage data-state is "done"
+      - tapping "Copy" writes lastResult.output, empties and blurs the field, and returns the button to "Paste" with the status still "All clear!"
+      - a refused Copy keeps the "Copy" button and reports the blocked status
+      - editing the field leaves Copy mode for "Clean", and Escape returns to "Paste"
+
   - id: app-field-height-sync
     type: unit
     file: test/app.test.js
@@ -560,6 +571,21 @@ manual_verified:
       - the panel border highlights during the drag, and the drop cleans the text/uri-list value
       - the console shows no Content-Security-Policy report or other error
 
+  - id: browser-write-back-copy-fallback
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run dev
+      - grant clipboard-read and clipboard-write permissions
+      - add an init script that makes the first navigator.clipboard.writeText call reject with a NotAllowedError DOMException
+    steps:
+      - at 390x844 and again at 1440x900, type a URL with tracking parameters and press Enter
+      - tap "Copy"
+    expected:
+      - after Enter the button reads "Copy", the status reads "All clear!", and the field shows the clean URL fully selected
+      - the newest mobile history entry stays above the grown panel
+      - after Copy the clipboard holds the clean URL, the field is empty and blurred, the button reads "Paste", and the status still reads "All clear!"
+
   - id: browser-pwa-basics
     type: browser
     tool: playwright-cli
@@ -579,7 +605,7 @@ gaps:
   - "iOS Safari and the home-screen PWA: tap the field, choose Paste from the QuickType bar, and confirm the clean and the clipboard write-back"
   - "iOS Safari and the home-screen PWA: long-press paste into the field, same checks"
   - "iOS Safari and the home-screen PWA: with the keyboard open, the panel stays above the keyboard and history remains scrollable"
-  - "macOS Safari: Cmd+V with nothing focused, Edit menu Paste, context-menu Paste, and the Add to Dock app"
+  - "macOS Safari: Cmd+V with nothing focused, Edit menu Paste, context-menu Paste, and the Add to Dock app; confirm write-back or the Copy fallback in each"
   - "Firefox desktop: Cmd+V cleans without showing a Paste bubble"
   - "Chrome desktop and installed PWA: Cmd+V and the paste button"
   - drag a link from the address bar and from another page onto the panel with a real pointer

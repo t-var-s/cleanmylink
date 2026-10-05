@@ -51,6 +51,11 @@ class FakeElement {
     this.focused = true;
   }
 
+  select() {
+    this.focused = true;
+    this.selected = true;
+  }
+
   blur() {
     this.focused = false;
   }
@@ -714,6 +719,120 @@ test("app syncs the field height and keeps the newest mobile entry in view when 
 
   assert.equal(input.style.height, "90px");
   assert.equal(historySection.scrollTop, 500);
+});
+
+function createRefusingClipboard({ refusals = 1, clipboardWrites }) {
+  let remainingRefusals = refusals;
+
+  return {
+    async readText() {
+      return "";
+    },
+
+    async writeText(value) {
+      if (remainingRefusals > 0) {
+        remainingRefusals -= 1;
+        const error = new Error("Write permission denied.");
+        error.name = "NotAllowedError";
+        throw error;
+      }
+
+      clipboardWrites.push(value);
+    }
+  };
+}
+
+test("app switches the button to Copy when the clipboard write-back is refused", async () => {
+  const clipboardWrites = [];
+  const { app, documentObject, errors } = createHarness({
+    navigatorOverrides: {
+      clipboard: createRefusingClipboard({ clipboardWrites })
+    }
+  });
+  const input = documentObject.querySelector("#clean-input");
+
+  await app.init();
+  await input.dispatchEvent(createPasteEvent({ "text/plain": "https://example.com/?utm_source=x&keep=1" }));
+
+  assert.deepEqual(clipboardWrites, []);
+  assert.equal(app.state.buttonMode, "copy");
+  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Copy");
+  assert.equal(documentObject.querySelector("#status-message").textContent, "All clear!");
+  assert.equal(documentObject.querySelector(".clean-stage").dataset.state, "done");
+  assert.equal(input.value, "https://example.com/?keep=1");
+  assert.equal(input.selected, true);
+  assert.equal(app.state.historyEntries[0].url, "https://example.com/?keep=1");
+  assert.deepEqual(errors, []);
+});
+
+test("app writes the last result when Copy is tapped, then empties the field and returns to Paste", async () => {
+  const clipboardWrites = [];
+  const { app, documentObject } = createHarness({
+    navigatorOverrides: {
+      clipboard: createRefusingClipboard({ clipboardWrites })
+    }
+  });
+  const input = documentObject.querySelector("#clean-input");
+  const button = documentObject.querySelector("#clean-button");
+
+  await app.init();
+  await typeInto(input, "HELLO   WORLD.");
+  await input.dispatchEvent(createKeyEvent("Enter"));
+  assert.equal(input.value, "Hello world.");
+
+  await button.dispatchEvent({ type: "click" });
+
+  assert.deepEqual(clipboardWrites, ["Hello world."]);
+  assert.equal(input.value, "");
+  assert.equal(input.focused, false);
+  assert.equal(app.state.buttonMode, "paste");
+  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Paste");
+  assert.equal(documentObject.querySelector(".clean-stage").dataset.state, "idle");
+  assert.equal(documentObject.querySelector("#status-message").textContent, "All clear!");
+});
+
+test("app keeps the Copy button and reports the block when Copy is refused too", async () => {
+  const clipboardWrites = [];
+  const { app, documentObject } = createHarness({
+    navigatorOverrides: {
+      clipboard: createRefusingClipboard({ refusals: 2, clipboardWrites })
+    }
+  });
+  const input = documentObject.querySelector("#clean-input");
+
+  await app.init();
+  await input.dispatchEvent(createPasteEvent({ "text/plain": "plain text" }));
+  await documentObject.querySelector("#clean-button").dispatchEvent({ type: "click" });
+
+  assert.deepEqual(clipboardWrites, []);
+  assert.equal(app.state.buttonMode, "copy");
+  assert.equal(input.value, "plain text");
+  assert.equal(
+    documentObject.querySelector("#status-message").textContent,
+    "Clipboard access is blocked. Try allowing clipboard permissions."
+  );
+});
+
+test("app leaves Copy mode when the field is edited or emptied", async () => {
+  const clipboardWrites = [];
+  const { app, documentObject } = createHarness({
+    navigatorOverrides: {
+      clipboard: createRefusingClipboard({ clipboardWrites })
+    }
+  });
+  const input = documentObject.querySelector("#clean-input");
+
+  await app.init();
+  await input.dispatchEvent(createPasteEvent({ "text/plain": "plain text" }));
+  assert.equal(app.state.buttonMode, "copy");
+
+  await typeInto(input, "plain text, edited");
+  assert.equal(app.state.buttonMode, "clean");
+  assert.equal(documentObject.querySelector(".clean-stage").dataset.state, "editing");
+
+  await input.dispatchEvent(createKeyEvent("Escape"));
+  assert.equal(app.state.buttonMode, "paste");
+  assert.equal(input.value, "");
 });
 
 test("app renders history newest-first on desktop and newest-near-action on mobile", async () => {
