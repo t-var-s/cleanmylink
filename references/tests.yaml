@@ -2,6 +2,26 @@ version: 1
 verified_on: 2026-04-15
 
 automated:
+  - id: diff-tokenizer
+    type: unit
+    file: test/diff.test.js
+    command: npm test
+    covers:
+      - tokenize splits on URL delimiters and whitespace and keeps them as tokens
+      - joining the tokens gives the original text back
+
+  - id: diff-segments
+    type: unit
+    file: test/diff.test.js
+    command: npm test
+    covers:
+      - removed query parameters appear as removed segments
+      - a host rewrite appears as removed plus added segments
+      - identical strings yield a single same segment
+      - a plain-text whitespace collapse is represented as removed plus added whitespace
+      - same plus removed segments rebuild the input and same plus added segments rebuild the output
+      - input above the token cap falls back to one removed and one added segment
+
   - id: transforms-tracking-params
     type: unit
     file: test/transforms.test.js

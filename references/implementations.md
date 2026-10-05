@@ -18,6 +18,7 @@ Verified on April 15, 2026:
 - [`../site.config.mjs`](../site.config.mjs): Vite-side page registry, shared head metadata including the viewport meta with `interactive-widget=resizes-content`, page-specific title/description values, and the shared CSP policy string
 - [`../src/styles.css`](../src/styles.css): mobile-first layout, button, history, settings, view-transition, responsive desktop breakpoint at `960px`, and reduced-motion handling
 - [`../src/transforms.js`](../src/transforms.js): ESM transform registry and shared cleanup logic for URLs and plain text
+- [`../src/diff.js`](../src/diff.js): pure token diff between the text before and after cleaning, used by the transformation display
 - [`../src/app.js`](../src/app.js): app factory and controller for the text field and its input sources, clipboard access, history persistence, startup history loading state, responsive layout, button states, and service worker update handling
 - [`../src/main.js`](../src/main.js): browser bootstrap entry that starts the app
 - [`../src/storage.js`](../src/storage.js): async storage adapter used by app and settings controllers
@@ -32,6 +33,7 @@ Verified on April 15, 2026:
 - [`../vite.config.mjs`](../vite.config.mjs): Vite config with explicit `dist` output
 - [`../netlify.toml`](../netlify.toml): Netlify build command, publish directory, and cache/security headers
 - [`../test/transforms.test.js`](../test/transforms.test.js): Node test suite for transform behavior
+- [`../test/diff.test.js`](../test/diff.test.js): Node test suite for the tokenizer and the token diff
 - [`../test/storage.test.js`](../test/storage.test.js): Node test suite for the storage adapter and domain-transform settings behavior
 - [`../test/app.test.js`](../test/app.test.js): Node test suite for app module import safety, history behavior, clipboard cleaning, the text field input sources, responsive history ordering, and PWA update button states
 - [`../test/build.test.js`](../test/build.test.js): Node test suite for build output and generated service worker behavior
@@ -76,6 +78,14 @@ Current default-enabled transforms:
 - `youtube.com` / `youtu.be` -> clear search params, then keep only `v` if present
 - whitespace cleanup for plain text
 - sentence-case conversion for all-caps plain text
+
+### `src/diff.js`
+
+`diff.js` is a pure ESM module with no DOM access. It exports:
+
+- `tokenize(text)`: splits on runs of whitespace and on the URL delimiters `/ ? # & = : . , ; ! @ $ ' ( ) * + [ ]`, keeping every delimiter as its own token, so joining the tokens gives the original text back. Words such as `utm_source` stay whole because `_` and `-` are not delimiters
+- `diffSegments(input, output)`: returns `{ text, kind }` segments with `kind` of `same`, `removed`, or `added`. It runs a longest-common-subsequence over the two token arrays with a quadratic `Uint16Array` table, then walks it forward. Within each changed run the removed text comes before the added text, empty segments are dropped, and neighbours of the same kind are merged. Concatenating the `same` and `removed` segments gives the input; `same` and `added` give the output
+- `maxDiffTokens` (300): above this many tokens on either side the diff falls back to one `removed` segment for the whole input and one `added` segment for the whole output. Identical strings return a single `same` segment without building the table
 
 ### `src/app.js`
 
@@ -335,6 +345,7 @@ Current security-relevant measures in the codebase:
 Current automated coverage:
 
 - transform behavior in [`../test/transforms.test.js`](../test/transforms.test.js)
+- tokenizer and token diff behavior in [`../test/diff.test.js`](../test/diff.test.js)
 - settings storage, domain-only settings behavior, and transform-setting default normalization in [`../test/storage.test.js`](../test/storage.test.js)
 - settings page controller behavior, including settings-read fallback and loading-state clearing, in [`../test/settings.test.js`](../test/settings.test.js)
 - import safety, startup history loading, malformed history fallback, history expiry pruning, history de-duplication, history limit enforcement, clipboard URL/text cleaning, unchanged-input status, unexpected clipboard failure handling, the refused write-back Copy fallback, field and document paste, typed text with Enter and Escape, drop sources, field reset and height sync, responsive history ordering, saved-link share/fallback behavior, PWA update button states, and the field in update mode for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
