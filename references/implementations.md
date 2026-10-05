@@ -13,7 +13,7 @@ Verified on April 15, 2026:
 
 ## File map
 
-- [`../index.html`](../index.html): main Vite HTML entry with the shared head injection marker, settings navigation, hero panel, button, history section, initial saved-links loading copy, and module script loading
+- [`../index.html`](../index.html): main Vite HTML entry with the shared head injection marker, settings navigation, hero panel with a visually hidden `h1` and a `role="status"` paragraph, button, history section, initial saved-links loading copy, and module script loading
 - [`../settings.html`](../settings.html): settings Vite HTML entry with the shared head injection marker, domain-transform toggles, initial settings loading row, disabled-until-ready save navigation, and module script loading
 - [`../site.config.mjs`](../site.config.mjs): Vite-side page registry, shared head metadata including the viewport meta with `interactive-widget=resizes-content`, page-specific title/description values, and the shared CSP policy string
 - [`../src/styles.css`](../src/styles.css): mobile-first layout, button, history, settings, view-transition, responsive desktop breakpoint at `960px`, and reduced-motion handling
@@ -190,6 +190,8 @@ Localhost development helper:
 
 ### `index.html` and `settings.html`
 
+The main page heading is a visually hidden `h1` that always reads `Clean My Link`. The status line is `<p id="status-message" class="status-message" role="status">`; `role="status"` gives it polite, atomic live-region semantics, so `ui.setStatus()` only needs to replace `textContent`. The status keeps the former heading's visual style through `.status-message`, including an explicit `font-weight: 700`, because the headline font ships only in weight 400 and the browser synthesizes the bold. `.visually-hidden` is the shared utility for off-screen text.
+
 Each HTML entry keeps a small `<head>` containing an `<!-- app-head -->` marker. During the Vite HTML transform, `vite.config.mjs` injects generated head tags from `site.config.mjs`.
 
 Shared generated head metadata:
@@ -233,6 +235,7 @@ The CSS matches the current product direction:
 - two-column product layout on desktop
 - startup loading styles for storage-backed history and settings content
 - settings page styles for the domain-toggle form
+- `.visually-hidden` utility for screen-reader-only text such as the page heading
 - cross-document View Transitions API opt-in with a restrained root fade and normal navigation fallback
 - no JavaScript calls `document.startViewTransition()`; page-to-page animation is browser-managed through `@view-transition { navigation: auto; }`
 - hover refinements only inside `@media (hover: hover)`

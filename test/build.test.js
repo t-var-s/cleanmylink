@@ -90,6 +90,14 @@ test("built pages receive shared and page-specific head metadata", () => {
   }
 });
 
+test("built main page keeps a stable heading and a live status region", () => {
+  const html = readDistFile("index.html");
+
+  assert.match(html, /<h1 class="visually-hidden">Clean My Link<\/h1>/);
+  assert.match(html, /<p id="status-message" class="status-message" role="status">/);
+  assert.doesNotMatch(html, /<h1 id="status-message"/);
+});
+
 test("Netlify CSP header stays aligned with the shared app policy", () => {
   const netlifyToml = readRootFile("netlify.toml");
   const match = netlifyToml.match(/Content-Security-Policy = "([^"]+)"/);

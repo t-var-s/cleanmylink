@@ -39,6 +39,18 @@
   box-sizing: border-box;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 html {
   min-height: 100%;
   background-color: var(--bg);
@@ -218,6 +230,7 @@ body {
 .status-message {
   max-width: 14ch;
   font-size: clamp(1.9rem, 8.8vw, 2.7rem);
+  font-weight: 700;
   line-height: 1.08;
   text-wrap: balance;
 }
