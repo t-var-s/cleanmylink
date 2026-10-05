@@ -155,12 +155,19 @@ function createClock() {
 function createWindowObject({
   innerWidth = 390,
   visualViewport,
+  scrollY = 0,
   clock = createClock(),
   reducedMotion = false
 } = {}) {
   return {
     innerWidth,
     visualViewport,
+    scrollY,
+    scrollCalls: [],
+    scrollTo(x, y) {
+      this.scrollCalls.push([x, y]);
+      this.scrollY = y;
+    },
     addEventListener() {},
     cancelAnimationFrame() {},
     requestAnimationFrame(callback) {
@@ -184,12 +191,14 @@ function createHarness({
   clipboardText = "",
   innerWidth = 390,
   visualViewport,
+  scrollY = 0,
   reducedMotion = false,
   navigatorOverrides = {},
   storageOverrides = {}
 } = {}) {
   const documentObject = createAppDocument();
   const clock = createClock();
+  const windowObject = createWindowObject({ innerWidth, visualViewport, scrollY, clock, reducedMotion });
   const historyWrites = [];
   const clipboardWrites = [];
   const errors = [];
@@ -226,7 +235,7 @@ function createHarness({
 
   const app = createApp({
     documentObject,
-    windowObject: createWindowObject({ innerWidth, visualViewport, clock, reducedMotion }),
+    windowObject,
     navigatorObject,
     locationObject: {
       hostname: "example.com"
@@ -242,6 +251,7 @@ function createHarness({
   return {
     app,
     documentObject,
+    windowObject,
     navigatorObject,
     storage,
     historyWrites,
@@ -1240,6 +1250,77 @@ test("app sizes the mobile column from the visual viewport and clears it on desk
     noViewportHarness.documentObject.documentElement.style.properties.has("--viewport-height"),
     false
   );
+});
+
+function createVisualViewport({ height = 512, offsetTop = 0, scale = 1 } = {}) {
+  return {
+    height,
+    offsetTop,
+    scale,
+    listeners: [],
+    addEventListener(type, handler, options) {
+      this.listeners.push({ type, handler, options });
+    }
+  };
+}
+
+test("app scrolls the window back to the origin when the keyboard pans the visual viewport", async () => {
+  const panned = createHarness({
+    innerWidth: 390,
+    visualViewport: createVisualViewport({ offsetTop: 318 })
+  });
+  await panned.app.init();
+  assert.deepEqual(panned.windowObject.scrollCalls, [[0, 0]]);
+
+  panned.windowObject.visualViewport.offsetTop = 0;
+  panned.app.layout.apply();
+  assert.deepEqual(panned.windowObject.scrollCalls, [[0, 0]]);
+
+  const scrolled = createHarness({
+    innerWidth: 390,
+    scrollY: 120,
+    visualViewport: createVisualViewport()
+  });
+  await scrolled.app.init();
+  assert.deepEqual(scrolled.windowObject.scrollCalls, [[0, 0]]);
+
+  const zoomed = createHarness({
+    innerWidth: 390,
+    visualViewport: createVisualViewport({ offsetTop: 318, scale: 2 })
+  });
+  await zoomed.app.init();
+  assert.deepEqual(zoomed.windowObject.scrollCalls, []);
+
+  const desktop = createHarness({
+    innerWidth: 1440,
+    visualViewport: createVisualViewport({ height: 900, offsetTop: 318 })
+  });
+  await desktop.app.init();
+  assert.deepEqual(desktop.windowObject.scrollCalls, []);
+
+  const resting = createHarness({
+    innerWidth: 390,
+    visualViewport: createVisualViewport()
+  });
+  await resting.app.init();
+  assert.deepEqual(resting.windowObject.scrollCalls, []);
+});
+
+test("app re-applies the layout on visual viewport resize and scroll", async () => {
+  const { app, windowObject } = createHarness({
+    innerWidth: 390,
+    visualViewport: createVisualViewport()
+  });
+  await app.init();
+
+  const bound = windowObject.visualViewport.listeners;
+  assert.deepEqual(bound.map((entry) => entry.type), ["resize", "scroll"]);
+  assert.ok(bound.every((entry) => entry.handler === app.layout.scheduleApply));
+  assert.ok(bound.every((entry) => entry.options?.passive === true));
+
+  windowObject.visualViewport.offsetTop = 200;
+  await bound[1].handler();
+  assert.deepEqual(windowObject.scrollCalls, [[0, 0]]);
 });
 
 test("app shares saved history entries when the Web Share API can share them", async () => {

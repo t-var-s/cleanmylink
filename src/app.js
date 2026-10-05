@@ -188,6 +188,7 @@ export function createApp({
         app.state.layout = nextLayout;
         documentObject.body.dataset.layout = nextLayout;
         app.layout.syncViewportHeight();
+        app.layout.resetViewportPan();
 
         if (changed) {
           app.ui.renderHistory();
@@ -210,6 +211,20 @@ export function createApp({
         documentObject.documentElement.style.removeProperty("--viewport-height");
       },
 
+      resetViewportPan() {
+        const viewport = windowObject.visualViewport;
+        const scale = viewport?.scale ?? 1;
+        const offsetTop = viewport?.offsetTop ?? 0;
+        const scrollY = windowObject.scrollY ?? 0;
+
+        // iOS pans the visual viewport to reveal the focused field before the
+        // body shrinks to the keyboard-free height, which leaves a gap. Pinch
+        // zoom also pans, so leave anything above scale 1 alone.
+        if (app.layout.isMobile() && scale <= 1 && (offsetTop > 0 || scrollY > 0)) {
+          windowObject.scrollTo(0, 0);
+        }
+      },
+
       scheduleApply() {
         if (app.state.resizeFrame) {
           windowObject.cancelAnimationFrame(app.state.resizeFrame);
@@ -227,6 +242,7 @@ export function createApp({
 
         if (windowObject.visualViewport && !app.state.viewportListenerBound) {
           windowObject.visualViewport.addEventListener("resize", app.layout.scheduleApply, { passive: true });
+          windowObject.visualViewport.addEventListener("scroll", app.layout.scheduleApply, { passive: true });
           app.state.viewportListenerBound = true;
         }
       }

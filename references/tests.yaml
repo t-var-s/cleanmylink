@@ -343,6 +343,16 @@ automated:
       - desktop layout removes --viewport-height
       - missing visualViewport support leaves --viewport-height unset so the CSS dvh fallback applies
 
+  - id: app-viewport-pan-reset
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - mobile layout calls window.scrollTo(0, 0) when visualViewport.offsetTop is above zero at scale 1
+      - mobile layout calls window.scrollTo(0, 0) when window.scrollY is above zero with the visual viewport at the origin
+      - no scroll reset at scale 2, on desktop, or when the offset is already 0
+      - visualViewport resize and scroll are both bound to the layout pass as passive listeners, and a scroll with a pending offset resets it
+
   - id: app-history-responsive-ordering
     type: unit
     file: test/app.test.js
