@@ -89,9 +89,10 @@ class FakeElement {
   }
 }
 
-function createWindowObject({ innerWidth = 390 } = {}) {
+function createWindowObject({ innerWidth = 390, visualViewport } = {}) {
   return {
     innerWidth,
+    visualViewport,
     addEventListener() {},
     cancelAnimationFrame() {},
     requestAnimationFrame(callback) {
@@ -106,6 +107,7 @@ function createHarness({
   domainSettings = {},
   clipboardText = "",
   innerWidth = 390,
+  visualViewport,
   navigatorOverrides = {},
   storageOverrides = {}
 } = {}) {
@@ -146,7 +148,7 @@ function createHarness({
 
   const app = createApp({
     documentObject,
-    windowObject: createWindowObject({ innerWidth }),
+    windowObject: createWindowObject({ innerWidth, visualViewport }),
     navigatorObject,
     locationObject: {
       hostname: "example.com"
@@ -175,7 +177,6 @@ function createAppDocument() {
     "#status-message": new FakeElement(),
     "#clean-button": new FakeElement(),
     ".clean-button-label": new FakeElement(),
-    ".hero-stage": new FakeElement(),
     ".history-section": new FakeElement(),
     "#history-list": new FakeElement(),
     "#history-empty": new FakeElement()
@@ -187,7 +188,15 @@ function createAppDocument() {
     },
     documentElement: {
       style: {
-        setProperty() {}
+        properties: new Map(),
+
+        setProperty(name, value) {
+          this.properties.set(name, value);
+        },
+
+        removeProperty(name) {
+          this.properties.delete(name);
+        }
       }
     },
 
@@ -460,6 +469,41 @@ test("app renders history newest-first on desktop and newest-near-action on mobi
   assert.deepEqual(
     mobileHarness.documentObject.querySelector("#history-list").children.map((item) => item.children[0].href),
     ["https://example.com/older", "https://example.com/newer"]
+  );
+});
+
+test("app sizes the mobile column from the visual viewport and clears it on desktop", async () => {
+  const mobileHarness = createHarness({
+    innerWidth: 390,
+    visualViewport: {
+      height: 512.5,
+      addEventListener() {}
+    }
+  });
+  await mobileHarness.app.init();
+  assert.equal(
+    mobileHarness.documentObject.documentElement.style.properties.get("--viewport-height"),
+    "512.5px"
+  );
+
+  const desktopHarness = createHarness({
+    innerWidth: 1440,
+    visualViewport: {
+      height: 900,
+      addEventListener() {}
+    }
+  });
+  await desktopHarness.app.init();
+  assert.equal(
+    desktopHarness.documentObject.documentElement.style.properties.has("--viewport-height"),
+    false
+  );
+
+  const noViewportHarness = createHarness({ innerWidth: 390 });
+  await noViewportHarness.app.init();
+  assert.equal(
+    noViewportHarness.documentObject.documentElement.style.properties.has("--viewport-height"),
+    false
   );
 });
 

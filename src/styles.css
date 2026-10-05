@@ -27,7 +27,6 @@
   --accent-ink: #081723;
   --focus: rgba(124, 199, 255, 0.28);
   --shadow: 0 20px 46px rgba(0, 0, 0, 0.3);
-  --hero-stage-height: 0px;
   --mobile-gutter: 0.9rem;
   --shell-width: 76rem;
   --desktop-history-width: 24rem;
@@ -57,9 +56,10 @@ html {
 }
 
 body {
+  display: flex;
+  flex-direction: column;
+  height: var(--viewport-height, 100dvh);
   margin: 0;
-  min-height: 100vh;
-  min-height: 100svh;
   overflow: hidden;
   touch-action: manipulation;
   color: var(--text);
@@ -145,28 +145,29 @@ body {
 }
 
 .app-shell {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   width: 100%;
-  min-height: 100vh;
-  min-height: 100svh;
+  min-height: 0;
 }
 
 .app-column {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   width: min(100%, 34rem);
-  min-height: 100vh;
-  min-height: 100svh;
+  min-height: 0;
   margin: 0 auto;
 }
 
 .hero-stage {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 3;
+  order: 2;
+  flex: none;
   padding:
     0
     var(--mobile-gutter)
-    0;
+    env(safe-area-inset-bottom, 0px);
 }
 
 .app-panel {
@@ -348,17 +349,13 @@ body {
 }
 
 .history-section {
+  order: 1;
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 0.9rem;
-  height: 100vh;
-  height: 100svh;
-  min-height: 100vh;
-  min-height: 100svh;
-  padding:
-    3.25rem
-    var(--mobile-gutter)
-    calc(var(--hero-stage-height) + env(safe-area-inset-bottom, 0px) + 1rem);
+  min-height: 0;
+  padding: 3.25rem var(--mobile-gutter) 1rem;
   border: none;
   border-radius: 0;
   background: transparent;
@@ -464,6 +461,10 @@ body {
 }
 
 .settings-page {
+  display: block;
+  height: auto;
+  min-height: 100vh;
+  min-height: 100svh;
   overflow: auto;
 }
 
@@ -697,6 +698,12 @@ body {
 
 }
 
+@media (min-width: 580px) {
+  .hero-stage {
+    padding-inline: 0;
+  }
+}
+
 @media (min-width: 700px) {
   .app-panel {
     gap: 1.2rem;
@@ -706,10 +713,17 @@ body {
 
 @media (min-width: 960px) {
   body {
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100svh;
     overflow: auto;
   }
 
   .app-shell {
+    display: block;
+    min-height: 100vh;
+    min-height: 100svh;
     padding: 2.25rem;
   }
 
@@ -725,14 +739,12 @@ body {
   }
 
   .hero-stage {
-    position: static;
     display: flex;
     align-items: center;
     justify-content: flex-start;
     min-height: calc(100vh - 4.5rem);
     min-height: calc(100svh - 4.5rem);
     padding: 0;
-    order: 2;
   }
 
   .app-panel-hero {
@@ -742,7 +754,6 @@ body {
   }
 
   .history-section {
-    order: 1;
     align-self: center;
     justify-self: end;
     width: 100%;

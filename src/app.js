@@ -41,7 +41,6 @@ export function createApp({
       status: documentObject.querySelector("#status-message"),
       button: documentObject.querySelector("#clean-button"),
       buttonLabel: documentObject.querySelector(".clean-button-label"),
-      heroStage: documentObject.querySelector(".hero-stage"),
       historySection: documentObject.querySelector(".history-section"),
       historyList: documentObject.querySelector("#history-list"),
       historyEmpty: documentObject.querySelector("#history-empty")
@@ -166,7 +165,7 @@ export function createApp({
 
         app.state.layout = nextLayout;
         documentObject.body.dataset.layout = nextLayout;
-        app.layout.measureHeroStage();
+        app.layout.syncViewportHeight();
 
         if (changed) {
           app.ui.renderHistory();
@@ -176,12 +175,17 @@ export function createApp({
         app.ui.syncHistoryScroll();
       },
 
-      measureHeroStage() {
-        const heroHeight = app.layout.isMobile()
-          ? Math.ceil(app.elements.heroStage.getBoundingClientRect().height)
-          : 0;
+      syncViewportHeight() {
+        const viewportHeight = app.layout.isMobile()
+          ? windowObject.visualViewport?.height
+          : null;
 
-        documentObject.documentElement.style.setProperty("--hero-stage-height", `${heroHeight}px`);
+        if (viewportHeight > 0) {
+          documentObject.documentElement.style.setProperty("--viewport-height", `${viewportHeight}px`);
+          return;
+        }
+
+        documentObject.documentElement.style.removeProperty("--viewport-height");
       },
 
       scheduleApply() {
@@ -203,16 +207,6 @@ export function createApp({
           windowObject.visualViewport.addEventListener("resize", app.layout.scheduleApply, { passive: true });
           app.state.viewportListenerBound = true;
         }
-
-        if (!windowObject.ResizeObserver) {
-          return;
-        }
-
-        const heroObserver = new windowObject.ResizeObserver(() => {
-          app.layout.scheduleApply();
-        });
-
-        heroObserver.observe(app.elements.heroStage);
       }
     },
 

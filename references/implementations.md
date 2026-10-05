@@ -15,7 +15,7 @@ Verified on April 15, 2026:
 
 - [`../index.html`](../index.html): main Vite HTML entry with the shared head injection marker, settings navigation, hero panel, button, history section, initial saved-links loading copy, and module script loading
 - [`../settings.html`](../settings.html): settings Vite HTML entry with the shared head injection marker, domain-transform toggles, initial settings loading row, disabled-until-ready save navigation, and module script loading
-- [`../site.config.mjs`](../site.config.mjs): Vite-side page registry, shared head metadata, page-specific title/description values, and the shared CSP policy string
+- [`../site.config.mjs`](../site.config.mjs): Vite-side page registry, shared head metadata including the viewport meta with `interactive-widget=resizes-content`, page-specific title/description values, and the shared CSP policy string
 - [`../src/styles.css`](../src/styles.css): mobile-first layout, button, history, settings, view-transition, responsive desktop breakpoint at `960px`, and reduced-motion handling
 - [`../src/transforms.js`](../src/transforms.js): ESM transform registry and shared cleanup logic for URLs and plain text
 - [`../src/app.js`](../src/app.js): app factory and controller for clipboard access, history persistence, startup history loading state, responsive layout, button states, and service worker update handling
@@ -139,7 +139,9 @@ Responsive behavior:
 - `body.dataset.layout` is set to `mobile` or `desktop`.
 - On mobile, history is rendered in reverse order and auto-scrolled to the bottom.
 - On desktop, history is rendered in storage order and scroll position is reset to the top.
-- `ResizeObserver`, `resize`, `orientationchange`, and `visualViewport.resize` are used to keep the layout stable.
+- `resize`, `orientationchange`, and `visualViewport.resize` all run `layout.apply()`, which re-syncs the layout mode, the viewport height variable, and the history scroll position.
+- `layout.syncViewportHeight()` sets `--viewport-height` on the root element to `visualViewport.height` in pixels on mobile and removes it on desktop or when `visualViewport` is unavailable. The stylesheet falls back to `100dvh`. iOS does not shrink the layout viewport for the on-screen keyboard, so this variable is what keeps the bottom panel above the keyboard.
+- There is no measurement of the hero panel. Status changes still go through `ui.setStatus()` or `ui.setPrimaryActionMode()`, which schedule `layout.apply()` so the mobile history list stays scrolled to its newest entry when the panel grows. Any future change that alters the panel height outside those paths must schedule `layout.apply()` or call `ui.syncHistoryScroll()` itself.
 
 Clipboard flow:
 
@@ -193,6 +195,7 @@ Each HTML entry keeps a small `<head>` containing an `<!-- app-head -->` marker.
 Shared generated head metadata:
 
 - character set, viewport, theme color, and referrer policy
+- the viewport meta is `width=device-width, initial-scale=1, interactive-widget=resizes-content`, so Chrome on Android shrinks the layout viewport for the on-screen keyboard; Safari ignores the extra directive
 - restrictive `Content-Security-Policy` meta tag
 - shared Open Graph and Twitter image metadata
 - manifest and icon links
@@ -220,7 +223,10 @@ The CSS matches the current product direction:
 
 - dark background with subtle grid
 - restrained card styling rather than marketing-heavy chrome
-- fixed bottom action area on mobile
+- mobile layout is a flex column: `body` is `height: var(--viewport-height, 100dvh)` with `overflow: hidden`, `.app-shell` and `.app-column` are flex columns that fill it, `.history-section` takes the remaining height with `flex: 1 1 auto; min-height: 0; overflow-y: auto`, and `.hero-stage` is `flex: none` at the bottom with `padding-bottom: env(safe-area-inset-bottom)`
+- the visual order on mobile comes from `order` on `.history-section` and `.hero-stage`, so the DOM keeps the hero first
+- below `580px` the hero keeps the mobile gutters; from `580px` the `34rem` column already fits inside the viewport with its gutters, so the hero panel fills the column, which keeps the width the old fixed panel had
+- `.settings-page` and the `960px` desktop breakpoint reset `body` to `display: block`, `height: auto`, and `overflow: auto`, so the settings page and the desktop grid scroll normally
 - two-column product layout on desktop
 - startup loading styles for storage-backed history and settings content
 - settings page styles for the domain-toggle form

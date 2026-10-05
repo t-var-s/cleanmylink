@@ -64,6 +64,10 @@ test("built pages receive shared and page-specific head metadata", () => {
     const html = readDistFile(path.basename(page.input));
 
     assert.doesNotMatch(html, /app-head/);
+    assert.match(
+      html,
+      /<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">/
+    );
     assert.match(html, new RegExp(`<title>${escapeRegExp(page.title)}</title>`));
     assert.match(
       html,
