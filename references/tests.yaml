@@ -286,16 +286,33 @@ automated:
     command: npm test
     covers:
       - the field is focused on load
-      - after a successful clean and write-back the field is empty, no longer focused, and the button reads "Paste"
+      - after a successful clean and write-back, the animation, and the hold, the field is empty, no longer focused, and the button reads "Paste"
       - the paste button focuses the field when navigator.clipboard.readText is unavailable
+
+  - id: app-stage-animation
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - writeText is called before the output renders anything
+      - the output shows the diff as span elements with tok-same, tok-removed, and tok-added classes filled through textContent
+      - rendering the output sets data-state "cleaning", adds has-output to the stage, starts is-animating, keeps the field focused, and keeps the newest mobile history entry in view
+      - a font-size transitionend on the output ends the animation, and other properties do not
+      - without transitionend the animation ends after 600 ms
+      - after the animation the plain clean string holds in the output with data-state "done" for 800 ms, then the field empties and blurs and the button reads "Paste"
+      - a second paste during the animation or the hold cancels the pending timer and shows only the new transformation
+      - Escape and a switch to update mode cancel the display and its timer
+      - typing during the display cancels it and returns to the editing state
+      - an unchanged result skips the collapse, pulses the status, and still holds
+      - an unexpected write-back failure clears the display and keeps the field content
 
   - id: app-write-back-copy-fallback
     type: unit
     file: test/app.test.js
     command: npm test
     covers:
-      - writeText rejecting with NotAllowedError switches the button to "Copy" and does not show the error status
-      - after a refused write-back the field still shows the clean string, selected, and the stage data-state is "done"
+      - writeText rejecting with NotAllowedError switches the button to "Copy" once the animation ends and does not show the error status
+      - after a refused write-back the field still shows the clean string, selected, the output is hidden, no timer is pending, and the stage data-state is "done"
       - tapping "Copy" writes lastResult.output, empties and blurs the field, and returns the button to "Paste" with the status still "All clear!"
       - a refused Copy keeps the "Copy" button and reports the blocked status
       - editing the field leaves Copy mode for "Clean", and Escape returns to "Paste"
@@ -595,7 +612,7 @@ manual_verified:
       - the button reads "Clean" while the field has typed text, and the field grows to five lines, then scrolls inside
       - the field never widens the panel or the page
       - the newest mobile history entry stays above the panel while the field grows and after the clean
-      - Enter writes the cleaned URL to the clipboard, empties and blurs the field, and the status becomes "All clear!"
+      - Enter writes the cleaned URL to the clipboard, the status becomes "All clear!", and after the animation and hold the field is empty and blurred
       - Escape empties the field and keeps focus
       - the panel border highlights during the drag, and the drop cleans the text/uri-list value
       - the console shows no Content-Security-Policy report or other error
@@ -611,9 +628,29 @@ manual_verified:
       - at 390x844 and again at 1440x900, type a URL with tracking parameters and press Enter
       - tap "Copy"
     expected:
-      - after Enter the button reads "Copy", the status reads "All clear!", and the field shows the clean URL fully selected
+      - after Enter and the animation the button reads "Copy", the status reads "All clear!", and the field shows the clean URL fully selected
       - the newest mobile history entry stays above the grown panel
       - after Copy the clipboard holds the clean URL, the field is empty and blurred, the button reads "Paste", and the status still reads "All clear!"
+
+  - id: browser-transformation-animation
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run dev
+      - grant clipboard-read and clipboard-write permissions
+      - seed at least six history entries
+    steps:
+      - at 390x844 and again at 1440x900, type a URL with tracking parameters long enough to grow the field to several lines
+      - stretch the 600 ms fallback, press Enter, and pause document.getAnimations() at 120 ms and 330 ms for screenshots
+      - resume the animations and capture the hold 300 ms later, then the end state
+      - repeat with https://x.com/someone/status/42?utm_source=x and capture frames at 0, 100, 260, 360, and 480 ms
+    expected:
+      - at 120 ms the removed tokens are dimmed and struck through, at 330 ms they are collapsing
+      - the host rewrite shows the old host shrinking while the new host grows in, and the output height does not change while tokens shrink at font-size 0
+      - the output has the same box as the field, so the swap does not move the panel, and the page never scrolls horizontally
+      - during the hold the plain clean URL shows with the field's focus ring and the button still reads "Clean"
+      - after the hold the field is empty and blurred, the button reads "Paste", and the newest mobile history entry stays above the panel in every frame
+      - the console shows no error
 
   - id: browser-update-mode-layout
     type: browser

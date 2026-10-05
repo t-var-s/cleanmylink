@@ -235,6 +235,11 @@ body {
   text-wrap: balance;
 }
 
+.status-message.is-pulsing {
+  transform-origin: left center;
+  animation: status-pulse 520ms ease;
+}
+
 .clean-form {
   --field-line: 1.4rem;
   --field-padding: 1.025rem;
@@ -246,6 +251,7 @@ body {
 }
 
 .clean-stage {
+  position: relative;
   display: flex;
   flex: 1 1 0;
   min-width: 0;
@@ -255,7 +261,8 @@ body {
   display: none;
 }
 
-.clean-input {
+.clean-input,
+.clean-output {
   display: block;
   width: 100%;
   min-height: calc(var(--field-line) + 2 * var(--field-padding) + 2px);
@@ -266,11 +273,14 @@ body {
   border-radius: 4px;
   background: rgba(9, 15, 23, 0.86);
   color: var(--text);
-  caret-color: var(--accent);
   font-family: var(--font-copy);
   font-size: 1rem;
   line-height: var(--field-line);
   overflow-y: auto;
+}
+
+.clean-input {
+  caret-color: var(--accent);
   resize: none;
   field-sizing: content;
   transition:
@@ -291,6 +301,64 @@ body {
 
 .clean-input:disabled {
   opacity: 0.55;
+}
+
+.clean-output {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.clean-output[hidden] {
+  display: none;
+}
+
+/* The field keeps focus and its value behind the output, without adding height. */
+.clean-stage.has-output .clean-input {
+  position: absolute;
+  inset: 0;
+  max-height: 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.clean-stage.has-output:focus-within .clean-output {
+  border-color: rgba(124, 199, 255, 0.78);
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+/* Top alignment keeps a shrinking token from stretching its line box. */
+.tok-removed,
+.tok-added {
+  vertical-align: top;
+  transition:
+    color 160ms ease,
+    text-decoration-color 160ms ease,
+    opacity 300ms ease 180ms,
+    font-size 300ms ease 180ms;
+}
+
+.tok-removed {
+  text-decoration-line: line-through;
+  text-decoration-color: transparent;
+}
+
+.tok-added {
+  font-size: 0;
+  opacity: 0;
+}
+
+.clean-output.is-animating .tok-removed {
+  color: var(--muted);
+  text-decoration-color: currentColor;
+  font-size: 0;
+  opacity: 0;
+}
+
+.clean-output.is-animating .tok-added {
+  font-size: 1em;
+  opacity: 1;
 }
 
 .clean-actions {
@@ -700,6 +768,13 @@ body {
 
   100% {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes status-pulse {
+  35% {
+    color: var(--accent);
+    transform: scale(1.03);
   }
 }
 

@@ -1,6 +1,7 @@
 import * as sharedTransforms from "./transforms.js";
 import { createStorageAdapter } from "./storage.js";
 import { composeEnabledTransforms } from "./settings-storage.js";
+import { diffSegments } from "./diff.js";
 
 export function createApp({
   documentObject = globalThis.document,
@@ -22,6 +23,8 @@ export function createApp({
       historyTtlMs: 72 * 60 * 60 * 1000,
       historyLimit: 100,
       desktopBreakpoint: 960,
+      animationTimeoutMs: 600,
+      resultHoldMs: 800,
       defaultStatus: "Remove junk parameters from any URL you paste, type or drop in.",
       defaultButtonLabel: "Paste",
       buttonLabels: {
@@ -64,6 +67,9 @@ export function createApp({
       buttonMode: "paste",
       stage: "idle",
       lastResult: null,
+      stageResult: null,
+      isAnimating: false,
+      animationTimer: 0,
       inputHeight: 0,
       dragDepth: 0,
       pwaRegistration: null,
@@ -231,6 +237,14 @@ export function createApp({
         app.layout.scheduleApply();
       },
 
+      pulseStatus() {
+        const { status } = app.elements;
+        status.classList.toggle("is-pulsing", false);
+        // Reading layout restarts the animation when the class comes back.
+        void status.offsetWidth;
+        status.classList.toggle("is-pulsing", true);
+      },
+
       setButtonLabel(label) {
         app.elements.buttonLabel.textContent = label;
       },
@@ -253,6 +267,7 @@ export function createApp({
         app.elements.input.disabled = isUpdateMode;
 
         if (isUpdateMode) {
+          app.stage.cancel();
           app.stage.setState("update");
           app.ui.setStatus(mode === "update" ? "updateAvailable" : "updateOffline");
           return;
@@ -389,6 +404,126 @@ export function createApp({
       setState(name) {
         app.state.stage = name;
         app.elements.stage.dataset.state = name;
+      },
+
+      isBusy() {
+        return app.state.stageResult !== null;
+      },
+
+      play(input, result) {
+        app.stage.cancel();
+        app.state.stageResult = result;
+
+        if (!result.changed) {
+          app.stage.render([{ text: result.output, kind: "same" }]);
+          return;
+        }
+
+        app.stage.render(diffSegments(input, result.output));
+        app.stage.animate();
+      },
+
+      render(segments) {
+        const { output } = app.elements;
+        output.innerHTML = "";
+        output.classList.toggle("is-animating", false);
+
+        for (const { text, kind } of segments) {
+          const token = documentObject.createElement("span");
+          token.className = `tok tok-${kind}`;
+          token.textContent = text;
+          output.append(token);
+        }
+
+        app.stage.showOutput(true);
+        app.stage.setState("cleaning");
+      },
+
+      showOutput(isVisible) {
+        app.elements.output.hidden = !isVisible;
+        app.elements.stage.classList.toggle("has-output", isVisible);
+        app.layout.scheduleApply();
+      },
+
+      animate() {
+        const { output } = app.elements;
+        // Reading layout commits the starting styles, so the class change transitions.
+        void output.offsetWidth;
+        output.classList.toggle("is-animating", true);
+        app.state.isAnimating = true;
+        app.state.animationTimer = windowObject.setTimeout(
+          app.stage.endAnimation,
+          app.config.animationTimeoutMs
+        );
+      },
+
+      handleTransitionEnd(event) {
+        if (event.propertyName === "font-size") {
+          app.stage.endAnimation();
+        }
+      },
+
+      endAnimation() {
+        if (!app.state.isAnimating) {
+          return;
+        }
+
+        app.state.isAnimating = false;
+        app.stage.clearTimer();
+
+        if (typeof app.state.stageResult?.written === "boolean") {
+          app.stage.settle();
+        }
+      },
+
+      finish(result) {
+        if (result !== app.state.stageResult) {
+          return;
+        }
+
+        if (!result.changed) {
+          app.ui.pulseStatus();
+        }
+
+        if (!app.state.isAnimating) {
+          app.stage.settle();
+        }
+      },
+
+      settle() {
+        const result = app.state.stageResult;
+
+        if (!result.written) {
+          app.stage.cancel();
+          app.input.showCopy(result.output);
+          return;
+        }
+
+        app.stage.render([{ text: result.output, kind: "same" }]);
+        app.stage.setState("done");
+        app.state.animationTimer = windowObject.setTimeout(
+          () => app.input.reset({ blur: true }),
+          app.config.resultHoldMs
+        );
+      },
+
+      clearTimer() {
+        if (app.state.animationTimer) {
+          windowObject.clearTimeout(app.state.animationTimer);
+          app.state.animationTimer = 0;
+        }
+      },
+
+      cancel() {
+        app.stage.clearTimer();
+        app.state.isAnimating = false;
+        app.state.stageResult = null;
+
+        if (!app.elements.output.hidden) {
+          app.elements.output.innerHTML = "";
+          app.elements.output.classList.toggle("is-animating", false);
+          app.stage.showOutput(false);
+        }
       }
     },
 
@@ -405,15 +540,27 @@ export function createApp({
         const result = app.transforms.cleanInput(text, {
           enabledTransforms: app.state.enabledTransforms
         });
-        app.state.lastResult = { ...result, source };
-        const { written } = await app.clipboard.writeBack(result.output);
-        app.ui.setStatus(result.changed ? "success" : "unchanged");
+        const cleaning = { ...result, source };
+        app.state.lastResult = cleaning;
+        // The write-back starts before anything else so it stays inside the activation.
+        const writing = app.clipboard.writeBack(result.output);
+        app.stage.play(text.trim(), cleaning);
 
-        if (written) {
-          app.input.reset({ blur: true });
-        } else {
-          app.input.showCopy(result.output);
+        let written;
+        try {
+          ({ written } = await writing);
+        } catch (error) {
+          if (app.state.stageResult === cleaning) {
+            app.stage.cancel();
+            app.input.refresh();
+          }
+
+          throw error;
         }
+
+        cleaning.written = written;
+        app.ui.setStatus(result.changed ? "success" : "unchanged");
+        app.stage.finish(cleaning);
 
         if (result.isUrl) {
           await app.history.save(result.output);
@@ -495,7 +642,7 @@ export function createApp({
           return app.input.handleSubmit(event);
         }
 
-        if (event.key === "Escape" && app.elements.input.value) {
+        if (event.key === "Escape" && (app.elements.input.value || app.stage.isBusy())) {
           event.preventDefault();
           app.input.reset();
         }
@@ -504,6 +651,7 @@ export function createApp({
       },
 
       handleInput() {
+        app.stage.cancel();
         app.input.syncHeight();
         app.input.refresh();
       },
@@ -600,6 +748,7 @@ export function createApp({
       },
 
       reset({ blur = false } = {}) {
+        app.stage.cancel();
         app.elements.input.value = "";
         app.input.syncHeight();
         app.input.refresh();
@@ -773,7 +922,7 @@ export function createApp({
       bind() {
         app.layout.bind();
 
-        const { button, form, input, stage, heroPanel } = app.elements;
+        const { button, form, input, output, stage, heroPanel } = app.elements;
 
         button.addEventListener("click", async () => {
           if (app.ui.isUpdateMode()) {
@@ -803,6 +952,7 @@ export function createApp({
         heroPanel.addEventListener("dragover", app.input.handleDragOver);
         heroPanel.addEventListener("dragleave", app.input.handleDragLeave);
         heroPanel.addEventListener("drop", app.input.handleDrop);
+        output.addEventListener("transitionend", app.stage.handleTransitionEnd);
         stage.addEventListener("click", (event) => {
           if (event.target !== input && !input.disabled) {
             input.focus();
