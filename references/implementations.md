@@ -13,12 +13,12 @@ Verified on April 15, 2026:
 
 ## File map
 
-- [`../index.html`](../index.html): main Vite HTML entry with the shared head injection marker, settings navigation, hero panel with a visually hidden `h1` and a `role="status"` paragraph, button, history section, initial saved-links loading copy, and module script loading
+- [`../index.html`](../index.html): main Vite HTML entry with the shared head injection marker, hero panel with a visually hidden `h1`, a `role="status"` paragraph, and the clean form (visually hidden label, `.clean-stage` with the textarea and a hidden `output`, and the action button), history section, initial saved-links loading copy, settings navigation after `main`, and module script loading
 - [`../settings.html`](../settings.html): settings Vite HTML entry with the shared head injection marker, domain-transform toggles, initial settings loading row, disabled-until-ready save navigation, and module script loading
 - [`../site.config.mjs`](../site.config.mjs): Vite-side page registry, shared head metadata including the viewport meta with `interactive-widget=resizes-content`, page-specific title/description values, and the shared CSP policy string
 - [`../src/styles.css`](../src/styles.css): mobile-first layout, button, history, settings, view-transition, responsive desktop breakpoint at `960px`, and reduced-motion handling
 - [`../src/transforms.js`](../src/transforms.js): ESM transform registry and shared cleanup logic for URLs and plain text
-- [`../src/app.js`](../src/app.js): app factory and controller for clipboard access, history persistence, startup history loading state, responsive layout, button states, and service worker update handling
+- [`../src/app.js`](../src/app.js): app factory and controller for the text field and its input sources, clipboard access, history persistence, startup history loading state, responsive layout, button states, and service worker update handling
 - [`../src/main.js`](../src/main.js): browser bootstrap entry that starts the app
 - [`../src/storage.js`](../src/storage.js): async storage adapter used by app and settings controllers
 - [`../src/settings-storage.js`](../src/settings-storage.js): settings normalization, defaulting, serialization, and enabled-transform composition helpers
@@ -33,7 +33,7 @@ Verified on April 15, 2026:
 - [`../netlify.toml`](../netlify.toml): Netlify build command, publish directory, and cache/security headers
 - [`../test/transforms.test.js`](../test/transforms.test.js): Node test suite for transform behavior
 - [`../test/storage.test.js`](../test/storage.test.js): Node test suite for the storage adapter and domain-transform settings behavior
-- [`../test/app.test.js`](../test/app.test.js): Node test suite for app module import safety, history behavior, clipboard cleaning, responsive history ordering, and PWA update button states
+- [`../test/app.test.js`](../test/app.test.js): Node test suite for app module import safety, history behavior, clipboard cleaning, the text field input sources, responsive history ordering, and PWA update button states
 - [`../test/build.test.js`](../test/build.test.js): Node test suite for build output and generated service worker behavior
 
 ## Runtime implementation details
@@ -93,6 +93,8 @@ The app object is organized with grouped concerns:
 - `layout`
 - `ui`
 - `clipboard`
+- `stage`
+- `input`
 - `pwa`
 - `dev`
 - `events`
@@ -105,8 +107,8 @@ Important behavior in the current implementation:
 - History TTL: `72 * 60 * 60 * 1000`
 - History limit: `100`
 - Desktop breakpoint: `960`
-- Default button mode: clean
-- Alternate button modes: update, retry-update
+- Default button mode: paste
+- Alternate button modes: clean, update, retry-update
 
 History handling:
 
@@ -141,12 +143,31 @@ Responsive behavior:
 - On desktop, history is rendered in storage order and scroll position is reset to the top.
 - `resize`, `orientationchange`, and `visualViewport.resize` all run `layout.apply()`, which re-syncs the layout mode, the viewport height variable, and the history scroll position.
 - `layout.syncViewportHeight()` sets `--viewport-height` on the root element to `visualViewport.height` in pixels on mobile and removes it on desktop or when `visualViewport` is unavailable. The stylesheet falls back to `100dvh`. iOS does not shrink the layout viewport for the on-screen keyboard, so this variable is what keeps the bottom panel above the keyboard.
-- There is no measurement of the hero panel. Status changes still go through `ui.setStatus()` or `ui.setPrimaryActionMode()`, which schedule `layout.apply()` so the mobile history list stays scrolled to its newest entry when the panel grows. Any future change that alters the panel height outside those paths must schedule `layout.apply()` or call `ui.syncHistoryScroll()` itself.
+- There is no measurement of the hero panel. Status changes still go through `ui.setStatus()` or `ui.setPrimaryActionMode()`, which schedule `layout.apply()` so the mobile history list stays scrolled to its newest entry when the panel grows. `input.syncHeight()` does the same whenever the textarea's rendered height changes. Any future change that alters the panel height outside those paths must schedule `layout.apply()` or call `ui.syncHistoryScroll()` itself.
+
+Input sources:
+
+All sources feed `input.clean(text, { source })`, which cleans with the enabled transforms, keeps the result in `state.lastResult`, writes it back to the clipboard, sets the status, empties and blurs the field, and saves URL results to history. Text that is empty after trimming reports the empty-clipboard status.
+
+- Paste into the field: the textarea `paste` handler reads `text/plain` from `clipboardData`, calls `preventDefault()` so nothing is inserted, and cleans. A paste always replaces the field content. Pastes without plain text keep the browser default.
+- Paste anywhere: a `document` `paste` handler cleans when the event target is not editable (`INPUT`, `TEXTAREA`, `SELECT`, or `isContentEditable`), which also leaves pastes into the main field to its own handler. Cmd+V or Ctrl+V therefore works without focusing the field.
+- Typed text: the `input` handler syncs the height and switches the button to `Clean` while the trimmed value is non-empty, and back to `Paste` when it is empty. `Clean`, Enter without Shift (ignored during IME composition), and the form `submit` event all clean the field value. Shift+Enter inserts a line break. Escape empties the field and keeps focus. There is no debounce-on-input cleaning.
+- Drop: `dragenter`, `dragover`, `dragleave`, and `drop` are handled on `.app-panel-hero`. Drags carrying `text/uri-list` or `text/plain` are accepted, highlighted with the `is-dragover` class, and counted with `state.dragDepth` so moving across child elements does not flicker the highlight. The drop reads the first non-comment line of `text/uri-list` and falls back to `text/plain`. Drags of files only are left to the browser.
+- Paste button: while the button reads `Paste`, the click handler starts `navigator.clipboard.readText()` synchronously before disabling the button, which keeps Safari's paste activation, then hands the text to `clipboard.cleanLatest()`, a thin wrapper around `input.clean()`. When `readText` is unavailable, the button focuses the field instead. The button never cleans field content in this mode.
+- `input.guard()` wraps every source: `NotAllowedError` reports the blocked status, any other failure reports the generic error, and the button loading state is always cleared.
+
+Field state:
+
+- `.clean-stage` carries `data-state`, set through `stage.setState()`: `idle` for an empty field and `editing` for typed text.
+- The form never submits natively; the CSP sets `form-action 'none'`, and the `submit` handler calls `preventDefault()`. The action button is `type="button"`.
+- The field is autofocused on load for every pointer type, unless something else already has focus, as the landing spot for a desktop paste. It is not refocused after a clean.
+- Clicking the stage outside the textarea focuses the field.
+- `input.syncHeight()` runs on every `input` event. Where `CSS.supports("field-sizing", "content")` is false it sets the inline height from `scrollHeight` plus the border; the stylesheet's `max-height` caps it at five lines. In both cases it schedules `layout.apply()` when `offsetHeight` changes.
 
 Clipboard flow:
 
-- Reads via `navigator.clipboard.readText()`
-- Writes the cleaned output with `navigator.clipboard.writeText(...)`
+- Reads via `navigator.clipboard.readText()` on the paste button path only; paste and drop events carry their own data
+- Writes the cleaned output with `navigator.clipboard.writeText(...)` immediately after cleaning, before any other await, so it stays inside the paste or click activation
 - Reads domain-transform settings during app startup through `storage.readDomainTransformSettings()`, composes them with default transforms, and keeps the resulting enabled-transform map in memory for clipboard cleaning.
 - If domain-transform settings cannot be read during main-page startup, the app falls back to default transform settings and logs the storage error.
 - Shows blocked/error/empty/success status messages based on the outcome
@@ -190,7 +211,7 @@ Localhost development helper:
 
 ### `index.html` and `settings.html`
 
-The main page heading is a visually hidden `h1` that always reads `Clean My Link`. The status line is `<p id="status-message" class="status-message" role="status">`; `role="status"` gives it polite, atomic live-region semantics, so `ui.setStatus()` only needs to replace `textContent`. The status keeps the former heading's visual style through `.status-message`, including an explicit `font-weight: 700`, because the headline font ships only in weight 400 and the browser synthesizes the bold. `.visually-hidden` is the shared utility for off-screen text.
+The main page heading is a visually hidden `h1` that always reads `Clean My Link`. Below the status, `#clean-form` holds a visually hidden `label` for `#clean-input`, the `.clean-stage` container with `data-state="idle"`, the textarea with `rows="1"`, `autocomplete="off"`, `autocapitalize="off"`, `autocorrect="off"`, `spellcheck="false"`, `enterkeyhint="done"`, and the placeholder `Paste a link here`, a hidden `output` element reserved for the transformation display, and `.clean-actions` with the action button. The textarea has no `inputmode="url"`, because the iOS URL keyboard drops the space bar and plain text is a supported input. The settings link sits after `main` in the DOM, so the tab order is field, action button, credit link, history links, then settings; it is `position: fixed`, so its place on screen does not change. The status line is `<p id="status-message" class="status-message" role="status">`; `role="status"` gives it polite, atomic live-region semantics, so `ui.setStatus()` only needs to replace `textContent`. The status keeps the former heading's visual style through `.status-message`, including an explicit `font-weight: 700`, because the headline font ships only in weight 400 and the browser synthesizes the bold. `.visually-hidden` is the shared utility for off-screen text.
 
 Each HTML entry keeps a small `<head>` containing an `<!-- app-head -->` marker. During the Vite HTML transform, `vite.config.mjs` injects generated head tags from `site.config.mjs`.
 
@@ -230,6 +251,9 @@ The CSS matches the current product direction:
 - below `580px` the hero keeps the mobile gutters; from `580px` the `34rem` column already fits inside the viewport with its gutters, so the hero panel fills the column, which keeps the width the old fixed panel had
 - `.settings-page` and the `960px` desktop breakpoint reset `body` to `display: block`, `height: auto`, and `overflow: auto`, so the settings page and the desktop grid scroll normally
 - the history section is not an `.app-panel`; its mobile rules are its own, and the `960px` block gives it the panel border, background, shadow, blur, `1.25rem` padding, and `1.2rem` gap directly. Between `540px` and `959px` the section therefore keeps its `3.25rem` top padding, mobile gutters, and `0.9rem` gap, where the old `.app-panel` media rules used to override them
+- the clean form is a flex row with the field stage taking the remaining width (`flex: 1 1 0`) and the action column fixed at a `6.5rem` minimum, so `Paste`, `Clean`, and future labels do not resize the field. The row aligns to the bottom, so the button stays next to the last line as the field grows. The form has `min-width: 0` because the hero panel is a grid and the field's min-content width would otherwise be an unbroken URL
+- `.clean-input` uses a `16px` font so iOS does not zoom on focus, a single-line height that matches the button, `field-sizing: content`, and `max-height` for five lines with internal scrolling. Focus shows the accent border and the shared focus ring
+- `.app-panel-hero.is-dragover` highlights the panel border while a text drag is over it
 - one `.push-button` class carries the blue gradient, border, shadow, pressed, hover, focus-visible, and disabled-cursor rules for the clean button, the settings link, and the settings save button. `.clean-button` only adds its size and typography, `.settings-link` and `.settings-save-button` only add the square icon sizing and their own positioning or disabled opacity
 - `touch-action: manipulation` is declared once on `html`; descendants inherit the effective value, so no other selector repeats it
 - two-column product layout on desktop
@@ -307,7 +331,7 @@ Current automated coverage:
 - transform behavior in [`../test/transforms.test.js`](../test/transforms.test.js)
 - settings storage, domain-only settings behavior, and transform-setting default normalization in [`../test/storage.test.js`](../test/storage.test.js)
 - settings page controller behavior, including settings-read fallback and loading-state clearing, in [`../test/settings.test.js`](../test/settings.test.js)
-- import safety, startup history loading, malformed history fallback, history expiry pruning, history de-duplication, history limit enforcement, clipboard URL/text cleaning, unchanged-input status, unexpected clipboard failure handling, responsive history ordering, saved-link share/fallback behavior, and PWA update button states for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
+- import safety, startup history loading, malformed history fallback, history expiry pruning, history de-duplication, history limit enforcement, clipboard URL/text cleaning, unchanged-input status, unexpected clipboard failure handling, field and document paste, typed text with Enter and Escape, drop sources, field reset and height sync, responsive history ordering, saved-link share/fallback behavior, and PWA update button states for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
 - build output, generated service worker, generated HTML head metadata, and Netlify CSP alignment checks in [`../test/build.test.js`](../test/build.test.js)
 
 Current gaps:

@@ -235,6 +235,72 @@ body {
   text-wrap: balance;
 }
 
+.clean-form {
+  --field-line: 1.4rem;
+  --field-padding: 1.025rem;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.clean-stage {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.clean-input {
+  display: block;
+  width: 100%;
+  min-height: calc(var(--field-line) + 2 * var(--field-padding) + 2px);
+  max-height: calc(5 * var(--field-line) + 2 * var(--field-padding) + 2px);
+  margin: 0;
+  padding: var(--field-padding) 0.9rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: rgba(9, 15, 23, 0.86);
+  color: var(--text);
+  caret-color: var(--accent);
+  font-family: var(--font-copy);
+  font-size: 1rem;
+  line-height: var(--field-line);
+  overflow-y: auto;
+  resize: none;
+  field-sizing: content;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.clean-input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.clean-input:focus {
+  outline: none;
+  border-color: rgba(124, 199, 255, 0.78);
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+.clean-input:disabled {
+  opacity: 0.55;
+}
+
+.clean-actions {
+  flex: none;
+  min-width: 6.5rem;
+}
+
+.app-panel-hero.is-dragover {
+  border-color: rgba(124, 199, 255, 0.78);
+  box-shadow:
+    0 0 0 3px var(--focus),
+    var(--shadow);
+}
+
 .clean-button {
   position: relative;
   display: grid;

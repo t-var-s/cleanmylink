@@ -22,8 +22,13 @@ export function createApp({
       historyTtlMs: 72 * 60 * 60 * 1000,
       historyLimit: 100,
       desktopBreakpoint: 960,
-      defaultStatus: "Remove junk parameters from any URL you've just copied.",
-      defaultButtonLabel: "Clean My Copied Link"
+      defaultStatus: "Remove junk parameters from any URL you paste, type or drop in.",
+      defaultButtonLabel: "Paste",
+      buttonLabels: {
+        clean: "Clean",
+        update: "Update Now",
+        "retry-update": "Try again"
+      }
     },
 
     messages: {
@@ -41,6 +46,11 @@ export function createApp({
       status: documentObject.querySelector("#status-message"),
       button: documentObject.querySelector("#clean-button"),
       buttonLabel: documentObject.querySelector(".clean-button-label"),
+      form: documentObject.querySelector("#clean-form"),
+      input: documentObject.querySelector("#clean-input"),
+      output: documentObject.querySelector("#clean-output"),
+      stage: documentObject.querySelector(".clean-stage"),
+      heroPanel: documentObject.querySelector(".app-panel-hero"),
       historySection: documentObject.querySelector(".history-section"),
       historyList: documentObject.querySelector("#history-list"),
       historyEmpty: documentObject.querySelector("#history-empty")
@@ -50,7 +60,11 @@ export function createApp({
       layout: null,
       resizeFrame: 0,
       viewportListenerBound: false,
-      buttonMode: "clean",
+      buttonMode: "paste",
+      stage: "idle",
+      lastResult: null,
+      inputHeight: 0,
+      dragDepth: 0,
       pwaRegistration: null,
       isReloadingForUpdate: false,
       historyEntries: [],
@@ -226,24 +240,29 @@ export function createApp({
         app.elements.button.toggleAttribute("aria-busy", isLoading);
       },
 
+      isUpdateMode(mode = app.state.buttonMode) {
+        return mode === "update" || mode === "retry-update";
+      },
+
       setPrimaryActionMode(mode) {
+        const wasUpdateMode = app.ui.isUpdateMode();
         app.state.buttonMode = mode;
+        app.ui.setButtonLabel(app.config.buttonLabels[mode] || app.config.defaultButtonLabel);
 
         if (mode === "update") {
           app.ui.setStatus("updateAvailable");
-          app.ui.setButtonLabel("Update Now");
           return;
         }
 
         if (mode === "retry-update") {
           app.ui.setStatus("updateOffline");
-          app.ui.setButtonLabel("Try again");
           return;
         }
 
-        app.elements.status.textContent = app.config.defaultStatus;
-        app.ui.setButtonLabel(app.config.defaultButtonLabel);
-        app.layout.scheduleApply();
+        if (wasUpdateMode) {
+          app.elements.status.textContent = app.config.defaultStatus;
+          app.layout.scheduleApply();
+        }
       },
 
       getOrderedEntries(entries) {
@@ -333,8 +352,20 @@ export function createApp({
 
     clipboard: {
       async cleanLatest(clipboardTextPromise = navigatorObject.clipboard.readText()) {
-        const clipboardText = await clipboardTextPromise;
-        if (!clipboardText.trim()) {
+        return app.input.clean(await clipboardTextPromise, { source: "clipboard" });
+      }
+    },
+
+    stage: {
+      setState(name) {
+        app.state.stage = name;
+        app.elements.stage.dataset.state = name;
+      }
+    },
+
+    input: {
+      async clean(text, { source } = {}) {
+        if (!text.trim()) {
           app.ui.setStatus("empty");
           return {
             changed: false,
@@ -342,11 +373,13 @@ export function createApp({
           };
         }
 
-        const result = app.transforms.cleanInput(clipboardText, {
+        const result = app.transforms.cleanInput(text, {
           enabledTransforms: app.state.enabledTransforms
         });
+        app.state.lastResult = { ...result, source };
         await navigatorObject.clipboard.writeText(result.output);
         app.ui.setStatus(result.changed ? "success" : "unchanged");
+        app.input.reset({ blur: true });
 
         if (result.isUrl) {
           await app.history.save(result.output);
@@ -357,6 +390,193 @@ export function createApp({
           ...result,
           hadClipboardText: true
         };
+      },
+
+      async guard(task) {
+        try {
+          return await task();
+        } catch (error) {
+          const statusKey = error?.name === "NotAllowedError" ? "blocked" : "error";
+          app.ui.setStatus(statusKey);
+          consoleObject.error(error);
+          return null;
+        } finally {
+          app.ui.setButtonLoading(false);
+        }
+      },
+
+      async pasteFromClipboard() {
+        if (typeof navigatorObject.clipboard?.readText !== "function") {
+          app.elements.input.focus();
+          return null;
+        }
+
+        return app.input.guard(() => {
+          app.ui.setStatus("loading");
+          const clipboardTextPromise = navigatorObject.clipboard.readText();
+          app.ui.setButtonLoading(true);
+          return app.clipboard.cleanLatest(clipboardTextPromise);
+        });
+      },
+
+      isEditableTarget(target) {
+        return Boolean(
+          target &&
+          (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
+        );
+      },
+
+      handlePaste(event) {
+        const text = event.clipboardData?.getData("text/plain") || "";
+        if (!text) {
+          return null;
+        }
+
+        event.preventDefault();
+        return app.input.guard(() => app.input.clean(text, { source: "paste" }));
+      },
+
+      handleDocumentPaste(event) {
+        if (event.defaultPrevented || app.input.isEditableTarget(event.target)) {
+          return null;
+        }
+
+        return app.input.handlePaste(event);
+      },
+
+      handleSubmit(event) {
+        event?.preventDefault();
+
+        const text = app.elements.input.value;
+        if (!text.trim()) {
+          return null;
+        }
+
+        return app.input.guard(() => app.input.clean(text, { source: "typed" }));
+      },
+
+      handleKeydown(event) {
+        if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+          return app.input.handleSubmit(event);
+        }
+
+        if (event.key === "Escape" && app.elements.input.value) {
+          event.preventDefault();
+          app.input.reset();
+        }
+
+        return null;
+      },
+
+      handleInput() {
+        app.input.syncHeight();
+        app.input.refresh();
+      },
+
+      acceptsDrag(event) {
+        const types = Array.from(event.dataTransfer?.types || []);
+        return types.includes("text/uri-list") || types.includes("text/plain");
+      },
+
+      setDragHighlight(isActive) {
+        app.elements.heroPanel.classList.toggle("is-dragover", isActive);
+      },
+
+      handleDragEnter(event) {
+        if (!app.input.acceptsDrag(event)) {
+          return;
+        }
+
+        event.preventDefault();
+        app.state.dragDepth += 1;
+        app.input.setDragHighlight(true);
+      },
+
+      handleDragOver(event) {
+        if (!app.input.acceptsDrag(event)) {
+          return;
+        }
+
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+      },
+
+      handleDragLeave(event) {
+        if (!app.input.acceptsDrag(event)) {
+          return;
+        }
+
+        app.state.dragDepth = Math.max(0, app.state.dragDepth - 1);
+        if (app.state.dragDepth === 0) {
+          app.input.setDragHighlight(false);
+        }
+      },
+
+      handleDrop(event) {
+        if (!app.input.acceptsDrag(event)) {
+          return null;
+        }
+
+        event.preventDefault();
+        app.state.dragDepth = 0;
+        app.input.setDragHighlight(false);
+
+        const text = app.input.readDropText(event.dataTransfer);
+        if (!text.trim()) {
+          return null;
+        }
+
+        return app.input.guard(() => app.input.clean(text, { source: "drop" }));
+      },
+
+      readDropText(dataTransfer) {
+        const uri = (dataTransfer.getData("text/uri-list") || "")
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .find((line) => line && !line.startsWith("#"));
+
+        return uri || dataTransfer.getData("text/plain") || "";
+      },
+
+      refresh() {
+        if (app.ui.isUpdateMode()) {
+          return;
+        }
+
+        const hasText = app.elements.input.value.trim() !== "";
+        app.ui.setPrimaryActionMode(hasText ? "clean" : "paste");
+        app.stage.setState(hasText ? "editing" : "idle");
+      },
+
+      reset({ blur = false } = {}) {
+        app.elements.input.value = "";
+        app.input.syncHeight();
+        app.input.refresh();
+
+        if (blur) {
+          app.elements.input.blur();
+        }
+      },
+
+      syncHeight() {
+        const { input } = app.elements;
+
+        if (!windowObject.CSS?.supports?.("field-sizing", "content")) {
+          input.style.height = "auto";
+          input.style.height = `${input.scrollHeight + input.offsetHeight - input.clientHeight}px`;
+        }
+
+        if (input.offsetHeight !== app.state.inputHeight) {
+          app.state.inputHeight = input.offsetHeight;
+          app.layout.scheduleApply();
+        }
+      },
+
+      focusOnLoad() {
+        const active = documentObject.activeElement;
+        if (!active || active === documentObject.body) {
+          app.elements.input.focus({ preventScroll: true });
+        }
       }
     },
 
@@ -502,23 +722,34 @@ export function createApp({
       bind() {
         app.layout.bind();
 
-        app.elements.button.addEventListener("click", async () => {
-          if (app.state.buttonMode !== "clean") {
+        const { button, form, input, stage, heroPanel } = app.elements;
+
+        button.addEventListener("click", async () => {
+          if (app.ui.isUpdateMode()) {
             await app.pwa.activateUpdate();
             return;
           }
 
-          try {
-            app.ui.setStatus("loading");
-            const clipboardTextPromise = navigatorObject.clipboard.readText();
-            app.ui.setButtonLoading(true);
-            await app.clipboard.cleanLatest(clipboardTextPromise);
-          } catch (error) {
-            const statusKey = error?.name === "NotAllowedError" ? "blocked" : "error";
-            app.ui.setStatus(statusKey);
-            consoleObject.error(error);
-          } finally {
-            app.ui.setButtonLoading(false);
+          if (app.state.buttonMode === "clean") {
+            await app.input.handleSubmit();
+            return;
+          }
+
+          await app.input.pasteFromClipboard();
+        });
+
+        form.addEventListener("submit", app.input.handleSubmit);
+        input.addEventListener("paste", app.input.handlePaste);
+        input.addEventListener("keydown", app.input.handleKeydown);
+        input.addEventListener("input", app.input.handleInput);
+        documentObject.addEventListener("paste", app.input.handleDocumentPaste);
+        heroPanel.addEventListener("dragenter", app.input.handleDragEnter);
+        heroPanel.addEventListener("dragover", app.input.handleDragOver);
+        heroPanel.addEventListener("dragleave", app.input.handleDragLeave);
+        heroPanel.addEventListener("drop", app.input.handleDrop);
+        stage.addEventListener("click", (event) => {
+          if (event.target !== input && !input.disabled) {
+            input.focus();
           }
         });
 
@@ -527,7 +758,7 @@ export function createApp({
         });
 
         windowObject.addEventListener("online", () => {
-          if (app.state.buttonMode !== "clean") {
+          if (app.ui.isUpdateMode()) {
             app.pwa.setUpdateMode();
           }
 
@@ -535,7 +766,7 @@ export function createApp({
         });
 
         windowObject.addEventListener("offline", () => {
-          if (app.state.buttonMode !== "clean") {
+          if (app.ui.isUpdateMode()) {
             app.ui.setPrimaryActionMode("retry-update");
           }
         });
@@ -577,6 +808,8 @@ export function createApp({
 
       app.dev.installHelpers();
       app.events.bind();
+      app.input.handleInput();
+      app.input.focusOnLoad();
       await app.pwa.register();
     }
   };

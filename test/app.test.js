@@ -13,11 +13,14 @@ function deferred() {
 }
 
 class FakeElement {
-  constructor() {
+  constructor(tagName = "DIV") {
+    this.tagName = tagName;
     this.attributes = new Map();
     this.children = [];
     this.classes = new Set();
+    this.dataset = {};
     this.listeners = new Map();
+    this.style = {};
     this.classList = {
       toggle: (className, force) => {
         const shouldAdd = force === undefined
@@ -34,11 +37,22 @@ class FakeElement {
       }
     };
     this.disabled = false;
+    this.focused = false;
     this.hidden = false;
     this.textContent = "";
+    this.value = "";
     this.scrollHeight = 0;
     this.clientHeight = 0;
+    this.offsetHeight = 0;
     this.scrollTop = 0;
+  }
+
+  focus() {
+    this.focused = true;
+  }
+
+  blur() {
+    this.focused = false;
   }
 
   append(...children) {
@@ -174,15 +188,21 @@ function createHarness({
 
 function createAppDocument() {
   const elements = {
-    "#status-message": new FakeElement(),
-    "#clean-button": new FakeElement(),
-    ".clean-button-label": new FakeElement(),
-    ".history-section": new FakeElement(),
-    "#history-list": new FakeElement(),
-    "#history-empty": new FakeElement()
+    "#status-message": new FakeElement("P"),
+    "#clean-button": new FakeElement("BUTTON"),
+    ".clean-button-label": new FakeElement("SPAN"),
+    "#clean-form": new FakeElement("FORM"),
+    "#clean-input": new FakeElement("TEXTAREA"),
+    "#clean-output": new FakeElement("OUTPUT"),
+    ".clean-stage": new FakeElement(),
+    ".app-panel-hero": new FakeElement(),
+    ".history-section": new FakeElement("SECTION"),
+    "#history-list": new FakeElement("UL"),
+    "#history-empty": new FakeElement("P")
   };
+  const documentObject = new FakeElement("HTML");
 
-  return {
+  return Object.assign(documentObject, {
     body: {
       dataset: {}
     },
@@ -204,12 +224,60 @@ function createAppDocument() {
       return elements[selector] || null;
     },
 
-    createElement() {
-      return new FakeElement();
-    },
+    createElement(tagName) {
+      return new FakeElement(tagName.toUpperCase());
+    }
+  });
+}
 
-    addEventListener() {}
+function createPasteEvent(data, extra = {}) {
+  return {
+    type: "paste",
+    defaultPrevented: false,
+    clipboardData: {
+      getData(format) {
+        return data[format] || "";
+      }
+    },
+    preventDefault() {
+      this.defaultPrevented = true;
+    },
+    ...extra
   };
+}
+
+function createDragEvent(type, data) {
+  return {
+    type,
+    defaultPrevented: false,
+    dataTransfer: {
+      types: Object.keys(data),
+      dropEffect: "none",
+      getData(format) {
+        return data[format] || "";
+      }
+    },
+    preventDefault() {
+      this.defaultPrevented = true;
+    }
+  };
+}
+
+function createKeyEvent(key, extra = {}) {
+  return {
+    type: "keydown",
+    key,
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    },
+    ...extra
+  };
+}
+
+async function typeInto(input, value) {
+  input.value = value;
+  await input.dispatchEvent({ type: "input" });
 }
 
 test("app module can be imported without browser DOM side effects", () => {
@@ -439,6 +507,213 @@ test("app reports unexpected clipboard failures and restores the primary button"
   );
   assert.equal(documentObject.querySelector("#clean-button").disabled, false);
   assert.equal(errors.length, 1);
+});
+
+test("app cleans text pasted into the field instead of inserting it", async () => {
+  const { app, documentObject, clipboardWrites, historyWrites } = createHarness();
+  const input = documentObject.querySelector("#clean-input");
+  const paste = createPasteEvent({
+    "text/plain": "https://example.com/path?utm_source=newsletter&keep=1"
+  });
+
+  await app.init();
+  await input.dispatchEvent(paste);
+
+  assert.equal(paste.defaultPrevented, true);
+  assert.deepEqual(clipboardWrites, ["https://example.com/path?keep=1"]);
+  assert.equal(app.state.historyEntries[0].url, "https://example.com/path?keep=1");
+  assert.equal(historyWrites.length, 1);
+  assert.equal(documentObject.querySelector("#status-message").textContent, "All clear!");
+  assert.equal(input.value, "");
+});
+
+test("app cleans document pastes outside editable elements and ignores the rest", async () => {
+  const { app, documentObject, clipboardWrites } = createHarness();
+  const text = { "text/plain": "HELLO   WORLD." };
+
+  await app.init();
+
+  const pageTarget = createPasteEvent(text, { target: new FakeElement("BUTTON") });
+  await documentObject.dispatchEvent(pageTarget);
+  assert.equal(pageTarget.defaultPrevented, true);
+  assert.deepEqual(clipboardWrites, ["Hello world."]);
+
+  const otherField = createPasteEvent(text, { target: new FakeElement("INPUT") });
+  const editableRegion = createPasteEvent(text, { target: { isContentEditable: true } });
+  const mainField = createPasteEvent(text, { target: documentObject.querySelector("#clean-input") });
+  await documentObject.dispatchEvent(otherField);
+  await documentObject.dispatchEvent(editableRegion);
+  await documentObject.dispatchEvent(mainField);
+
+  assert.equal(otherField.defaultPrevented, false);
+  assert.equal(editableRegion.defaultPrevented, false);
+  assert.equal(mainField.defaultPrevented, false);
+  assert.deepEqual(clipboardWrites, ["Hello world."]);
+});
+
+test("app labels the button Paste when the field is empty and Clean once it has typed text", async () => {
+  let readCalls = 0;
+  const clipboardWrites = [];
+  const { app, documentObject } = createHarness({
+    navigatorOverrides: {
+      clipboard: {
+        async readText() {
+          readCalls += 1;
+          return "";
+        },
+
+        async writeText(value) {
+          clipboardWrites.push(value);
+        }
+      }
+    }
+  });
+  const input = documentObject.querySelector("#clean-input");
+  const label = documentObject.querySelector(".clean-button-label");
+  const stage = documentObject.querySelector(".clean-stage");
+
+  await app.init();
+  assert.equal(label.textContent, "Paste");
+  assert.equal(stage.dataset.state, "idle");
+
+  await typeInto(input, "HELLO   WORLD.");
+  assert.equal(label.textContent, "Clean");
+  assert.equal(app.state.buttonMode, "clean");
+  assert.equal(stage.dataset.state, "editing");
+
+  await documentObject.querySelector("#clean-button").dispatchEvent({ type: "click" });
+
+  assert.equal(readCalls, 0);
+  assert.deepEqual(clipboardWrites, ["Hello world."]);
+  assert.equal(label.textContent, "Paste");
+  assert.equal(stage.dataset.state, "idle");
+});
+
+test("app cleans the typed value on Enter and empties the field on Escape", async () => {
+  const { app, documentObject, clipboardWrites } = createHarness();
+  const input = documentObject.querySelector("#clean-input");
+
+  await app.init();
+
+  await typeInto(input, "first line");
+  const shiftEnter = createKeyEvent("Enter", { shiftKey: true });
+  await input.dispatchEvent(shiftEnter);
+  assert.equal(shiftEnter.defaultPrevented, false);
+  assert.deepEqual(clipboardWrites, []);
+
+  const enter = createKeyEvent("Enter");
+  await input.dispatchEvent(enter);
+  assert.equal(enter.defaultPrevented, true);
+  assert.deepEqual(clipboardWrites, ["first line"]);
+
+  await typeInto(input, "never cleaned");
+  const escape = createKeyEvent("Escape");
+  await input.dispatchEvent(escape);
+  assert.equal(escape.defaultPrevented, true);
+  assert.equal(input.value, "");
+  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Paste");
+  assert.deepEqual(clipboardWrites, ["first line"]);
+});
+
+test("app keeps the form from submitting natively", async () => {
+  const { app, documentObject, clipboardWrites } = createHarness();
+  const submit = createKeyEvent("Enter", { type: "submit" });
+
+  await app.init();
+  await typeInto(documentObject.querySelector("#clean-input"), "typed text");
+  await documentObject.querySelector("#clean-form").dispatchEvent(submit);
+
+  assert.equal(submit.defaultPrevented, true);
+  assert.deepEqual(clipboardWrites, ["typed text"]);
+});
+
+test("app cleans dropped links, preferring text/uri-list over text/plain", async () => {
+  const { app, documentObject, clipboardWrites } = createHarness();
+  const panel = documentObject.querySelector(".app-panel-hero");
+  const uriData = {
+    "text/uri-list": "# dragged from the address bar\r\nhttps://example.com/a?utm_source=x\r\n",
+    "text/plain": "https://example.com/b"
+  };
+
+  await app.init();
+
+  const enter = createDragEvent("dragenter", uriData);
+  await panel.dispatchEvent(enter);
+  assert.equal(enter.defaultPrevented, true);
+  assert.equal(panel.classes.has("is-dragover"), true);
+
+  const over = createDragEvent("dragover", uriData);
+  await panel.dispatchEvent(over);
+  assert.equal(over.defaultPrevented, true);
+  assert.equal(over.dataTransfer.dropEffect, "copy");
+
+  const drop = createDragEvent("drop", uriData);
+  await panel.dispatchEvent(drop);
+  assert.equal(drop.defaultPrevented, true);
+  assert.equal(panel.classes.has("is-dragover"), false);
+  assert.deepEqual(clipboardWrites, ["https://example.com/a"]);
+
+  await panel.dispatchEvent(createDragEvent("drop", { "text/plain": "https://example.com/b?fbclid=1" }));
+  assert.deepEqual(clipboardWrites, ["https://example.com/a", "https://example.com/b"]);
+
+  const files = createDragEvent("drop", { Files: "" });
+  await panel.dispatchEvent(files);
+  assert.equal(files.defaultPrevented, false);
+});
+
+test("app empties and blurs the field after a successful clean and write-back", async () => {
+  const { app, documentObject, clipboardWrites } = createHarness();
+  const input = documentObject.querySelector("#clean-input");
+
+  await app.init();
+  assert.equal(input.focused, true);
+
+  await typeInto(input, "https://example.com/?gclid=1");
+  await input.dispatchEvent(createKeyEvent("Enter"));
+
+  assert.deepEqual(clipboardWrites, ["https://example.com/"]);
+  assert.equal(input.value, "");
+  assert.equal(input.focused, false);
+  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Paste");
+  assert.equal(documentObject.querySelector(".clean-stage").dataset.state, "idle");
+});
+
+test("app focuses the field when the paste button cannot read the clipboard", async () => {
+  const { app, documentObject, errors } = createHarness({
+    navigatorOverrides: {
+      clipboard: {}
+    }
+  });
+  const input = documentObject.querySelector("#clean-input");
+
+  await app.init();
+  const status = documentObject.querySelector("#status-message");
+  status.textContent = app.config.defaultStatus;
+  input.blur();
+  await documentObject.querySelector("#clean-button").dispatchEvent({ type: "click" });
+
+  assert.equal(input.focused, true);
+  assert.equal(status.textContent, "Remove junk parameters from any URL you paste, type or drop in.");
+  assert.deepEqual(errors, []);
+});
+
+test("app syncs the field height and keeps the newest mobile entry in view when the field grows", async () => {
+  const { app, documentObject } = createHarness();
+  const input = documentObject.querySelector("#clean-input");
+  const historySection = documentObject.querySelector(".history-section");
+
+  await app.init();
+  historySection.scrollHeight = 500;
+  historySection.clientHeight = 200;
+  historySection.scrollTop = 0;
+
+  input.scrollHeight = 88;
+  input.clientHeight = 88;
+  input.offsetHeight = 90;
+  await typeInto(input, "a\nb\nc");
+
+  assert.equal(input.style.height, "90px");
+  assert.equal(historySection.scrollTop, 500);
 });
 
 test("app renders history newest-first on desktop and newest-near-action on mobile", async () => {

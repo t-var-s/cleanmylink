@@ -4,10 +4,6 @@
     <!-- app-head -->
   </head>
   <body>
-    <a class="push-button settings-link" href="/settings.html" aria-label="Open settings">
-      <img src="/assets/icon_settings.webp" alt="" width="318" height="318">
-    </a>
-
     <main class="app-shell">
       <div class="app-column">
         <section class="hero-stage">
@@ -16,16 +12,35 @@
               <p class="eyebrow">Clipboard utility</p>
               <h1 class="visually-hidden">Clean My Link</h1>
               <p id="status-message" class="status-message" role="status">
-                Remove junk parameters from any URL you've just copied.
+                Remove junk parameters from any URL you paste, type or drop in.
               </p>
             </div>
 
-            <button id="clean-button" class="push-button clean-button" type="button">
-              <span class="clean-button-label">Clean My Copied Link</span>
-              <span class="button-loading" aria-hidden="true">
-                <span class="button-spinner"></span>
-              </span>
-            </button>
+            <form id="clean-form" class="clean-form">
+              <label class="visually-hidden" for="clean-input">Link or text to clean</label>
+              <div class="clean-stage" data-state="idle">
+                <textarea
+                  id="clean-input"
+                  class="clean-input"
+                  rows="1"
+                  placeholder="Paste a link here"
+                  autocomplete="off"
+                  autocapitalize="off"
+                  autocorrect="off"
+                  spellcheck="false"
+                  enterkeyhint="done"
+                ></textarea>
+                <output id="clean-output" class="clean-output" for="clean-input" hidden></output>
+              </div>
+              <div class="clean-actions">
+                <button id="clean-button" class="push-button clean-button" type="button">
+                  <span class="clean-button-label">Paste</span>
+                  <span class="button-loading" aria-hidden="true">
+                    <span class="button-spinner"></span>
+                  </span>
+                </button>
+              </div>
+            </form>
 
             <p class="hero-credit">
               Web app built by
@@ -48,6 +63,10 @@
         </section>
       </div>
     </main>
+
+    <a class="push-button settings-link" href="/settings.html" aria-label="Open settings">
+      <img src="/assets/icon_settings.webp" alt="" width="318" height="318">
+    </a>
 
     <script type="module" src="/src/main.js"></script>
   </body>

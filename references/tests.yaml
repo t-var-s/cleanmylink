@@ -221,6 +221,62 @@ automated:
       - unexpected clipboard failures report the generic failure message
       - the primary button is restored after an unexpected clipboard failure
 
+  - id: app-field-paste
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - a paste event on the field cleans the pasted text and prevents default insertion
+      - the field paste writes the cleaned result back to the clipboard
+      - the field paste saves URL results to history
+
+  - id: app-document-paste
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - a paste event on the document with a non-editable target cleans the pasted text
+      - document pastes targeting another input, a contenteditable region, or the main field are ignored by the document handler
+
+  - id: app-typed-input
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - the button reads "Paste" when the field is empty and "Clean" once it has typed text
+      - the stage data-state is "idle" for an empty field and "editing" for typed text
+      - tapping "Clean" cleans the field content without reading the clipboard
+      - Enter cleans the typed value, Shift+Enter does not
+      - Escape empties the field and returns the button to "Paste"
+      - the form submit event cleans the typed value and never submits natively
+
+  - id: app-drop-input
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - dragenter and dragover accept text drags and highlight the hero panel
+      - a drop prefers the first non-comment line of text/uri-list
+      - a drop falls back to text/plain
+      - drops carrying only files are left to the browser
+
+  - id: app-field-reset
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - the field is focused on load
+      - after a successful clean and write-back the field is empty, no longer focused, and the button reads "Paste"
+      - the paste button focuses the field when navigator.clipboard.readText is unavailable
+
+  - id: app-field-height-sync
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - without field-sizing support the field height follows its scrollHeight
+      - a change in field height re-applies the layout so the newest mobile history entry stays in view
+
   - id: app-viewport-height-variable
     type: unit
     file: test/app.test.js
@@ -326,7 +382,7 @@ manual_verified:
       - grant clipboard-read and clipboard-write permissions for that origin
     steps:
       - write "https://example.com/path?utm_source=test&keep=1" to the clipboard
-      - click "Clean My Copied Link"
+      - click "Paste"
     expected:
       - status becomes "All clear!"
       - clipboard becomes "https://example.com/path?keep=1"
@@ -341,7 +397,7 @@ manual_verified:
       - ensure local storage is empty
       - write an empty string to the clipboard
     steps:
-      - click "Clean My Copied Link"
+      - click "Paste"
     expected:
       - status becomes "No text was found in your clipboard."
       - no history item is created
@@ -354,7 +410,7 @@ manual_verified:
       - grant clipboard-read and clipboard-write permissions
       - write "HELLO   WORLD.\nTHIS IS FINE." to the clipboard
     steps:
-      - click "Clean My Copied Link"
+      - click "Paste"
     expected:
       - clipboard becomes "Hello world. This is fine."
       - status becomes "All clear!"
@@ -461,7 +517,7 @@ manual_verified:
       - start the app with npm run start
       - open the page without clipboard-read permission
     steps:
-      - click "Clean My Copied Link"
+      - click "Paste"
     expected:
       - status becomes "Clipboard access is blocked. Try allowing clipboard permissions."
 
@@ -472,13 +528,37 @@ manual_verified:
       - open the HTTPS deployment in Safari on iOS or macOS without pre-granting clipboard access
       - copy a URL from another app or origin
     steps:
-      - click "Clean My Copied Link"
+      - click "Paste"
       - confirm Safari immediately presents its native Paste control
       - choose Paste
     expected:
       - the clipboard read is accepted as part of the primary-action user activation
       - the URL is cleaned and written back to the clipboard
       - status becomes "All clear!"
+
+  - id: browser-field-input-sources
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run dev
+      - open http://127.0.0.1:5173 at a mobile viewport around 390x844 and again at 1440x900
+      - grant clipboard-read and clipboard-write permissions
+      - seed at least six history entries
+    steps:
+      - type a URL long enough to wrap past five lines
+      - press Enter
+      - type text into the field and press Escape
+      - dispatch dragenter and drop events carrying text/uri-list and text/plain on the hero panel
+      - review the browser console
+    expected:
+      - the field is focused on load and the button reads "Paste"
+      - the button reads "Clean" while the field has typed text, and the field grows to five lines, then scrolls inside
+      - the field never widens the panel or the page
+      - the newest mobile history entry stays above the panel while the field grows and after the clean
+      - Enter writes the cleaned URL to the clipboard, empties and blurs the field, and the status becomes "All clear!"
+      - Escape empties the field and keeps focus
+      - the panel border highlights during the drag, and the drop cleans the text/uri-list value
+      - the console shows no Content-Security-Policy report or other error
 
   - id: browser-pwa-basics
     type: browser
@@ -496,6 +576,13 @@ manual_verified:
       - manifest.webmanifest responds with HTTP 200
 
 gaps:
+  - "iOS Safari and the home-screen PWA: tap the field, choose Paste from the QuickType bar, and confirm the clean and the clipboard write-back"
+  - "iOS Safari and the home-screen PWA: long-press paste into the field, same checks"
+  - "iOS Safari and the home-screen PWA: with the keyboard open, the panel stays above the keyboard and history remains scrollable"
+  - "macOS Safari: Cmd+V with nothing focused, Edit menu Paste, context-menu Paste, and the Add to Dock app"
+  - "Firefox desktop: Cmd+V cleans without showing a Paste bubble"
+  - "Chrome desktop and installed PWA: Cmd+V and the paste button"
+  - drag a link from the address bar and from another page onto the panel with a real pointer
   - VoiceOver announcing the status region once per clean while the heading stays "Clean My Link" needs a manual check on iOS and macOS Safari
   - the visual-viewport-driven mobile column has not been verified on a real iPhone with the on-screen keyboard open; that check belongs with the text box work
   - Safari's native Paste control and transient clipboard activation require manual verification because the browser-owned UI is not exposed to the current automation harness
