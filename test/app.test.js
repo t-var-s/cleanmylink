@@ -1024,6 +1024,83 @@ test("app ignores user-cancelled saved history shares", async () => {
   assert.deepEqual(errors, []);
 });
 
+function createWaitingRegistration() {
+  return {
+    waiting: {
+      postMessage() {}
+    },
+    addEventListener() {},
+    async update() {}
+  };
+}
+
+test("app ignores pastes, drops, and Enter in update mode", async () => {
+  const { app, documentObject, clipboardWrites } = createHarness();
+  const input = documentObject.querySelector("#clean-input");
+  const status = documentObject.querySelector("#status-message");
+
+  await app.init();
+  await typeInto(input, "typed before the update");
+  app.pwa.bindRegistration(createWaitingRegistration());
+
+  const fieldPaste = createPasteEvent({ "text/plain": "https://example.com/?utm_source=x" });
+  const documentPaste = createPasteEvent(
+    { "text/plain": "https://example.com/?utm_source=x" },
+    { target: new FakeElement("BUTTON") }
+  );
+  const drop = createDragEvent("drop", { "text/plain": "https://example.com/?utm_source=x" });
+  const enter = createKeyEvent("Enter");
+  await input.dispatchEvent(fieldPaste);
+  await documentObject.dispatchEvent(documentPaste);
+  await documentObject.querySelector(".app-panel-hero").dispatchEvent(drop);
+  await input.dispatchEvent(enter);
+
+  assert.equal(fieldPaste.defaultPrevented, false);
+  assert.equal(documentPaste.defaultPrevented, false);
+  assert.equal(drop.defaultPrevented, false);
+  assert.deepEqual(clipboardWrites, []);
+  assert.equal(app.state.buttonMode, "update");
+  assert.equal(status.textContent, "A new version for this app is available online.");
+});
+
+test("app disables the field in update mode and restores it on return to clean mode", async () => {
+  const { app, documentObject } = createHarness({
+    navigatorOverrides: {
+      onLine: false
+    }
+  });
+  const input = documentObject.querySelector("#clean-input");
+  const stage = documentObject.querySelector(".clean-stage");
+  const label = documentObject.querySelector(".clean-button-label");
+
+  await app.init();
+  app.pwa.bindRegistration(createWaitingRegistration());
+
+  assert.equal(input.disabled, true);
+  assert.equal(stage.dataset.state, "update");
+  assert.equal(label.textContent, "Try again");
+
+  app.pwa.setUpdateMode();
+  assert.equal(input.disabled, true);
+  assert.equal(stage.dataset.state, "update");
+
+  app.ui.setPrimaryActionMode("paste");
+  assert.equal(input.disabled, false);
+  assert.equal(stage.dataset.state, "idle");
+  assert.equal(label.textContent, "Paste");
+  assert.equal(
+    documentObject.querySelector("#status-message").textContent,
+    "Remove junk parameters from any URL you paste, type or drop in."
+  );
+
+  input.value = "kept while updating";
+  app.pwa.setUpdateMode();
+  app.ui.setPrimaryActionMode("paste");
+  assert.equal(app.state.buttonMode, "clean");
+  assert.equal(label.textContent, "Clean");
+  assert.equal(stage.dataset.state, "editing");
+});
+
 test("app switches PWA update actions between offline retry and online activation", async () => {
   const postedMessages = [];
   const registration = {

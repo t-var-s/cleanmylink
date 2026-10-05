@@ -325,6 +325,15 @@ automated:
       - waiting service workers switch the primary button into update mode when the device is online
       - update activation posts a SKIP_WAITING message to the waiting worker
 
+  - id: app-update-mode-field
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - update and retry-update modes disable the field and set the stage data-state to "update"
+      - returning to a clean mode re-enables the field, restores the default status, and derives "Paste" or "Clean" from the field content
+      - field pastes, document pastes, drops, and Enter are ignored in update mode
+
   - id: settings-controller-domain-settings
     type: unit
     file: test/settings.test.js
@@ -585,6 +594,19 @@ manual_verified:
       - after Enter the button reads "Copy", the status reads "All clear!", and the field shows the clean URL fully selected
       - the newest mobile history entry stays above the grown panel
       - after Copy the clipboard holds the clean URL, the field is empty and blurred, the button reads "Paste", and the status still reads "All clear!"
+
+  - id: browser-update-mode-layout
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run dev, where service worker registration is skipped
+      - seed at least six history entries
+    steps:
+      - at 390x844 and again at 1440x900, import /src/app.js in the page, create a second unbound app, and call ui.setPrimaryActionMode with "update", "retry-update", then "paste"
+    expected:
+      - in both update modes the field is disabled and hidden and the button spans the full row with "Update Now" or "Try again"
+      - the newest mobile history entry stays above the panel as its height changes
+      - returning to "paste" shows the enabled field, the "Paste" button beside it, and the default status
 
   - id: browser-pwa-basics
     type: browser

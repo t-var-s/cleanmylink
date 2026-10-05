@@ -158,7 +158,8 @@ All sources feed `input.clean(text, { source })`, which cleans with the enabled 
 
 Field state:
 
-- `.clean-stage` carries `data-state`, set through `stage.setState()`: `idle` for an empty field, `editing` for typed text, and `done` while a refused write-back leaves the clean string in the field.
+- `.clean-stage` carries `data-state`, set through `stage.setState()`: `idle` for an empty field, `editing` for typed text, `done` while a refused write-back leaves the clean string in the field, and `update` in the PWA update modes.
+- `ui.setPrimaryActionMode()` disables the textarea in the `update` and `retry-update` modes and sets the stage to `update`, which hides it so the action button spans the full row as `Update Now` or `Try again`, as before the field existed. Returning to a clean mode re-enables the field, restores the default status, and re-derives `Paste` or `Clean` from any text the field kept. In update mode the paste handlers, the drop handlers, and the submit path ignore their events and leave the browser default alone. The `online` and `offline` listeners check `ui.isUpdateMode()`.
 - The form never submits natively; the CSP sets `form-action 'none'`, and the `submit` handler calls `preventDefault()`. The action button is `type="button"`.
 - The field is autofocused on load for every pointer type, unless something else already has focus, as the landing spot for a desktop paste. It is not refocused after a clean.
 - Clicking the stage outside the textarea focuses the field.
@@ -257,6 +258,7 @@ The CSS matches the current product direction:
 - the history section is not an `.app-panel`; its mobile rules are its own, and the `960px` block gives it the panel border, background, shadow, blur, `1.25rem` padding, and `1.2rem` gap directly. Between `540px` and `959px` the section therefore keeps its `3.25rem` top padding, mobile gutters, and `0.9rem` gap, where the old `.app-panel` media rules used to override them
 - the clean form is a flex row with the field stage taking the remaining width (`flex: 1 1 0`) and the action column fixed at a `6.5rem` minimum, so `Paste`, `Clean`, and future labels do not resize the field. The row aligns to the bottom, so the button stays next to the last line as the field grows. The form has `min-width: 0` because the hero panel is a grid and the field's min-content width would otherwise be an unbroken URL
 - `.clean-input` uses a `16px` font so iOS does not zoom on focus, a single-line height that matches the button, `field-sizing: content`, and `max-height` for five lines with internal scrolling. Focus shows the accent border and the shared focus ring
+- `.clean-stage[data-state="update"]` is hidden and the adjacent `.clean-actions` grows to the full row, so update mode reuses the full-width `.push-button` look
 - `.app-panel-hero.is-dragover` highlights the panel border while a text drag is over it
 - one `.push-button` class carries the blue gradient, border, shadow, pressed, hover, focus-visible, and disabled-cursor rules for the clean button, the settings link, and the settings save button. `.clean-button` only adds its size and typography, `.settings-link` and `.settings-save-button` only add the square icon sizing and their own positioning or disabled opacity
 - `touch-action: manipulation` is declared once on `html`; descendants inherit the effective value, so no other selector repeats it
@@ -335,7 +337,7 @@ Current automated coverage:
 - transform behavior in [`../test/transforms.test.js`](../test/transforms.test.js)
 - settings storage, domain-only settings behavior, and transform-setting default normalization in [`../test/storage.test.js`](../test/storage.test.js)
 - settings page controller behavior, including settings-read fallback and loading-state clearing, in [`../test/settings.test.js`](../test/settings.test.js)
-- import safety, startup history loading, malformed history fallback, history expiry pruning, history de-duplication, history limit enforcement, clipboard URL/text cleaning, unchanged-input status, unexpected clipboard failure handling, the refused write-back Copy fallback, field and document paste, typed text with Enter and Escape, drop sources, field reset and height sync, responsive history ordering, saved-link share/fallback behavior, and PWA update button states for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
+- import safety, startup history loading, malformed history fallback, history expiry pruning, history de-duplication, history limit enforcement, clipboard URL/text cleaning, unchanged-input status, unexpected clipboard failure handling, the refused write-back Copy fallback, field and document paste, typed text with Enter and Escape, drop sources, field reset and height sync, responsive history ordering, saved-link share/fallback behavior, PWA update button states, and the field in update mode for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
 - build output, generated service worker, generated HTML head metadata, and Netlify CSP alignment checks in [`../test/build.test.js`](../test/build.test.js)
 
 Current gaps:

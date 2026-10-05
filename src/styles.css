@@ -251,6 +251,10 @@ body {
   min-width: 0;
 }
 
+.clean-stage[data-state="update"] {
+  display: none;
+}
+
 .clean-input {
   display: block;
   width: 100%;
@@ -292,6 +296,10 @@ body {
 .clean-actions {
   flex: none;
   min-width: 6.5rem;
+}
+
+.clean-stage[data-state="update"] + .clean-actions {
+  flex: 1 1 auto;
 }
 
 .app-panel-hero.is-dragover {

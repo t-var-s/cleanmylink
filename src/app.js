@@ -247,21 +247,20 @@ export function createApp({
 
       setPrimaryActionMode(mode) {
         const wasUpdateMode = app.ui.isUpdateMode();
+        const isUpdateMode = app.ui.isUpdateMode(mode);
         app.state.buttonMode = mode;
         app.ui.setButtonLabel(app.config.buttonLabels[mode] || app.config.defaultButtonLabel);
+        app.elements.input.disabled = isUpdateMode;
 
-        if (mode === "update") {
-          app.ui.setStatus("updateAvailable");
-          return;
-        }
-
-        if (mode === "retry-update") {
-          app.ui.setStatus("updateOffline");
+        if (isUpdateMode) {
+          app.stage.setState("update");
+          app.ui.setStatus(mode === "update" ? "updateAvailable" : "updateOffline");
           return;
         }
 
         if (wasUpdateMode) {
           app.elements.status.textContent = app.config.defaultStatus;
+          app.input.refresh();
           app.layout.scheduleApply();
         }
       },
@@ -464,7 +463,7 @@ export function createApp({
 
       handlePaste(event) {
         const text = event.clipboardData?.getData("text/plain") || "";
-        if (!text) {
+        if (!text || app.ui.isUpdateMode()) {
           return null;
         }
 
@@ -484,7 +483,7 @@ export function createApp({
         event?.preventDefault();
 
         const text = app.elements.input.value;
-        if (!text.trim()) {
+        if (!text.trim() || app.ui.isUpdateMode()) {
           return null;
         }
 
@@ -510,6 +509,10 @@ export function createApp({
       },
 
       acceptsDrag(event) {
+        if (app.ui.isUpdateMode()) {
+          return false;
+        }
+
         const types = Array.from(event.dataTransfer?.types || []);
         return types.includes("text/uri-list") || types.includes("text/plain");
       },
