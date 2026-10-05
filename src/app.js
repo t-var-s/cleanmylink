@@ -640,7 +640,7 @@ export function createApp({
 
       handlePaste(event) {
         const text = event.clipboardData?.getData("text/plain") || "";
-        if (!text || app.ui.isUpdateMode()) {
+        if (!text.trim() || app.ui.isUpdateMode()) {
           return null;
         }
 
@@ -656,11 +656,15 @@ export function createApp({
         return app.input.handlePaste(event);
       },
 
+      isHoldingResult() {
+        return app.stage.isBusy() && app.state.stageResult.written === true;
+      },
+
       handleSubmit(event) {
         event?.preventDefault();
 
         const text = app.elements.input.value;
-        if (!text.trim() || app.ui.isUpdateMode()) {
+        if (!text.trim() || app.ui.isUpdateMode() || app.input.isHoldingResult()) {
           return null;
         }
 

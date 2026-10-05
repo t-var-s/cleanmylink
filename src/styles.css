@@ -178,10 +178,7 @@ body {
 .hero-stage {
   order: 2;
   flex: none;
-  padding:
-    0
-    var(--mobile-gutter)
-    env(safe-area-inset-bottom, 0px);
+  padding: 0 var(--mobile-gutter);
 }
 
 .app-panel {

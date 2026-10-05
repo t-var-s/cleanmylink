@@ -782,6 +782,58 @@ test("app holds the clean string after the animation, then empties and blurs the
   assert.equal(clock.pending, 0);
 });
 
+test("app ignores Clean and Enter while a written result holds in the output", async () => {
+  const { app, documentObject, clipboardWrites, clock } = createHarness();
+  const input = documentObject.querySelector("#clean-input");
+  const button = documentObject.querySelector("#clean-button");
+  const stage = documentObject.querySelector(".clean-stage");
+  const label = documentObject.querySelector(".clean-button-label");
+
+  await app.init();
+  await typeInto(input, "https://example.com/?gclid=1");
+  await input.dispatchEvent(createKeyEvent("Enter"));
+  await clock.advance(app.config.animationTimeoutMs);
+
+  assert.equal(stage.dataset.state, "done");
+  assert.equal(label.textContent, "Clean");
+  assert.deepEqual(clipboardWrites, ["https://example.com/"]);
+
+  await button.dispatchEvent({ type: "click" });
+  const enter = createKeyEvent("Enter");
+  await input.dispatchEvent(enter);
+
+  assert.equal(enter.defaultPrevented, true);
+  assert.deepEqual(clipboardWrites, ["https://example.com/"]);
+  assert.equal(stage.dataset.state, "done");
+  assert.equal(clock.pending, 1);
+
+  await clock.advance(app.config.resultHoldMs);
+  assert.equal(stage.dataset.state, "idle");
+  assert.equal(input.value, "");
+  assert.equal(label.textContent, "Paste");
+  assert.equal(clock.pending, 0);
+});
+
+test("app leaves whitespace-only pastes to the browser", async () => {
+  const { app, documentObject, clipboardWrites } = createHarness();
+  const input = documentObject.querySelector("#clean-input");
+  const status = documentObject.querySelector("#status-message");
+  const stage = documentObject.querySelector(".clean-stage");
+  const fieldPaste = createPasteEvent({ "text/plain": "  \n\t " });
+  const pagePaste = createPasteEvent({ "text/plain": "   " }, { target: new FakeElement("BUTTON") });
+
+  await app.init();
+  const statusBefore = status.textContent;
+  await input.dispatchEvent(fieldPaste);
+  await documentObject.dispatchEvent(pagePaste);
+
+  assert.equal(fieldPaste.defaultPrevented, false);
+  assert.equal(pagePaste.defaultPrevented, false);
+  assert.deepEqual(clipboardWrites, []);
+  assert.equal(status.textContent, statusBefore);
+  assert.equal(stage.dataset.state, "idle");
+});
+
 test("app renders the transformation as text spans after the write-back has started", async () => {
   const clipboardWrites = [];
   let documentObject;
