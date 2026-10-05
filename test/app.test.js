@@ -819,6 +819,53 @@ test("app renders the transformation as text spans after the write-back has star
   assert.equal(input.focused, true);
 });
 
+test("app finishes the stage immediately when the injected matchMedia reports reduced motion", async () => {
+  const { app, documentObject, clipboardWrites, clock } = createHarness({ reducedMotion: true });
+  const input = documentObject.querySelector("#clean-input");
+  const output = documentObject.querySelector("#clean-output");
+  const status = documentObject.querySelector("#status-message");
+
+  await app.init();
+  await typeInto(input, "https://example.com/?utm_source=x");
+  await input.dispatchEvent(createKeyEvent("Enter"));
+
+  assert.deepEqual(clipboardWrites, ["https://example.com/"]);
+  assert.equal(output.hidden, true);
+  assert.deepEqual(output.children, []);
+  assert.equal(input.value, "");
+  assert.equal(input.focused, false);
+  assert.equal(app.state.stage, "idle");
+  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Paste");
+  assert.equal(clock.pending, 0);
+
+  await input.dispatchEvent(createPasteEvent({ "text/plain": "https://example.com/path?keep=ok" }));
+  assert.equal(status.textContent, "All clear!");
+  assert.equal(status.classes.has("is-pulsing"), false);
+  assert.equal(output.hidden, true);
+  assert.equal(clock.pending, 0);
+});
+
+test("app shows Copy immediately under reduced motion when the write-back is refused", async () => {
+  const clipboardWrites = [];
+  const { app, documentObject, clock } = createHarness({
+    reducedMotion: true,
+    navigatorOverrides: {
+      clipboard: createRefusingClipboard({ clipboardWrites })
+    }
+  });
+  const input = documentObject.querySelector("#clean-input");
+
+  await app.init();
+  await input.dispatchEvent(createPasteEvent({ "text/plain": "https://example.com/?utm_source=x&keep=1" }));
+
+  assert.equal(app.state.buttonMode, "copy");
+  assert.equal(app.state.stage, "done");
+  assert.equal(input.value, "https://example.com/?keep=1");
+  assert.equal(input.selected, true);
+  assert.equal(documentObject.querySelector("#clean-output").hidden, true);
+  assert.equal(clock.pending, 0);
+});
+
 test("app ends the animation after 600 ms when transitionend never fires", async () => {
   const { app, documentObject, clock } = createHarness();
   const input = documentObject.querySelector("#clean-input");

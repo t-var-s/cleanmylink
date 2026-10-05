@@ -25,6 +25,7 @@ export function createApp({
       desktopBreakpoint: 960,
       animationTimeoutMs: 600,
       resultHoldMs: 800,
+      reducedMotionQuery: "(prefers-reduced-motion: reduce)",
       defaultStatus: "Remove junk parameters from any URL you paste, type or drop in.",
       defaultButtonLabel: "Paste",
       buttonLabels: {
@@ -410,9 +411,17 @@ export function createApp({
         return app.state.stageResult !== null;
       },
 
+      prefersReducedMotion() {
+        return windowObject.matchMedia?.(app.config.reducedMotionQuery)?.matches === true;
+      },
+
       play(input, result) {
         app.stage.cancel();
         app.state.stageResult = result;
+
+        if (app.stage.prefersReducedMotion()) {
+          return;
+        }
 
         if (!result.changed) {
           app.stage.render([{ text: result.output, kind: "same" }]);
@@ -481,7 +490,7 @@ export function createApp({
           return;
         }
 
-        if (!result.changed) {
+        if (!result.changed && !app.stage.prefersReducedMotion()) {
           app.ui.pulseStatus();
         }
 
@@ -496,6 +505,11 @@ export function createApp({
         if (!result.written) {
           app.stage.cancel();
           app.input.showCopy(result.output);
+          return;
+        }
+
+        if (app.stage.prefersReducedMotion()) {
+          app.input.reset({ blur: true });
           return;
         }
 

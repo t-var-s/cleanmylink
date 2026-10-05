@@ -185,6 +185,7 @@ Transformation display:
 - the button keeps its label during the animation and the hold, so a typed clean still reads `Clean` until the reset, and a tap on `Clean` cleans the field text again
 - `stage.cancel()` clears `state.animationTimer`, forgets `state.stageResult`, empties and hides the output, and schedules `layout.apply()`. It runs from `stage.play()` for a new paste, drop, typed clean, or paste-button clean, from `input.reset()` for Escape, Copy, and the end of the hold, from the `input` handler when the user types, and from `ui.setPrimaryActionMode()` when update mode starts. A write-back that settles after its display was cancelled changes nothing on the stage
 - the textarea stays focused and keeps its value under the output. While `.clean-stage` has `has-output` it is positioned over the output with `opacity: 0` and no pointer events, so it adds no height, keeps the on-screen keyboard open until the blur at the end of the hold, and still receives typing, Enter, and Escape. If the write-back fails unexpectedly, the display is cancelled and the field shows its previous content with the generic error status
+- reduced motion: `stage.prefersReducedMotion()` reads `windowObject.matchMedia(config.reducedMotionQuery)`, where the query is `(prefers-reduced-motion: reduce)`, and treats a missing `matchMedia` as no preference. When it matches, `stage.play()` renders nothing and `stage.finish()` settles straight to the end state with no hold and no status pulse: a successful write empties and blurs the field and returns the button to `Paste` as soon as the write resolves, and a refused write shows the Copy state at once. The JS branch is needed because the stylesheet's global reduced-motion rule sets `transition: none`, so `transitionend` would never fire and the display would otherwise wait for the 600 ms timeout and then hold
 - `#clean-output` is `aria-hidden="true"`: the `output` element is a live region by default, and the status paragraph is the only announcement per clean
 
 Clipboard flow:
@@ -364,14 +365,14 @@ Current automated coverage:
 - tokenizer and token diff behavior in [`../test/diff.test.js`](../test/diff.test.js)
 - settings storage, domain-only settings behavior, and transform-setting default normalization in [`../test/storage.test.js`](../test/storage.test.js)
 - settings page controller behavior, including settings-read fallback and loading-state clearing, in [`../test/settings.test.js`](../test/settings.test.js)
-- import safety, startup history loading, malformed history fallback, history expiry pruning, history de-duplication, history limit enforcement, clipboard URL/text cleaning, unchanged-input status, unexpected clipboard failure handling, the transformation display with its transitionend and timeout endings, hold, and cancellation, the refused write-back Copy fallback, field and document paste, typed text with Enter and Escape, drop sources, field reset and height sync, responsive history ordering, saved-link share/fallback behavior, PWA update button states, and the field in update mode for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
+- import safety, startup history loading, malformed history fallback, history expiry pruning, history de-duplication, history limit enforcement, clipboard URL/text cleaning, unchanged-input status, unexpected clipboard failure handling, the transformation display with its transitionend and timeout endings, hold, cancellation, and reduced-motion branch, the refused write-back Copy fallback, field and document paste, typed text with Enter and Escape, drop sources, field reset and height sync, responsive history ordering, saved-link share/fallback behavior, PWA update button states, and the field in update mode for [`../src/app.js`](../src/app.js) in [`../test/app.test.js`](../test/app.test.js)
 - build output, generated service worker, generated HTML head metadata, and Netlify CSP alignment checks in [`../test/build.test.js`](../test/build.test.js)
 
 Current gaps:
 
 - no automated browser test for clipboard permission states
 - no automated browser test for service worker registration, update lifecycle, or offline cache reuse
-- no automated browser test for reduced-motion behavior
+- reduced motion is covered by unit tests with an injected `matchMedia` and by a playwright-cli run with `page.emulateMedia({ reducedMotion: 'reduce' })`, not by an automated browser test
 
 ## Local development
 
