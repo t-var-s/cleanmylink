@@ -26,10 +26,9 @@ export function createApp({
       animationTimeoutMs: 600,
       resultHoldMs: 800,
       reducedMotionQuery: "(prefers-reduced-motion: reduce)",
-      defaultStatus: "Remove junk parameters from any URL you paste, type or drop in.",
-      defaultButtonLabel: "Paste",
+      defaultStatus: "Remove junk parameters from any URL you paste or drop in.",
+      defaultButtonLabel: "Paste a link here",
       buttonLabels: {
-        clean: "Clean",
         copy: "Copy",
         update: "Update Now",
         "retry-update": "Try again"
@@ -43,6 +42,7 @@ export function createApp({
       unchanged: "All clear!",
       blocked: "Clipboard access is blocked. Try allowing clipboard permissions.",
       error: "Something went sideways while cleaning your clipboard.",
+      pasteHint: "Press Cmd+V or Ctrl+V to paste a link.",
       updateAvailable: "A new version for this app is available online.",
       updateOffline: "Network went offline, can't update."
     },
@@ -51,8 +51,6 @@ export function createApp({
       status: documentObject.querySelector("#status-message"),
       button: documentObject.querySelector("#clean-button"),
       buttonLabel: documentObject.querySelector(".clean-button-label"),
-      form: documentObject.querySelector("#clean-form"),
-      input: documentObject.querySelector("#clean-input"),
       output: documentObject.querySelector("#clean-output"),
       stage: documentObject.querySelector(".clean-stage"),
       heroPanel: documentObject.querySelector(".app-panel-hero"),
@@ -64,14 +62,12 @@ export function createApp({
     state: {
       layout: null,
       resizeFrame: 0,
-      viewportListenerBound: false,
       buttonMode: "paste",
       stage: "idle",
       lastResult: null,
       stageResult: null,
       isAnimating: false,
       animationTimer: 0,
-      inputHeight: 0,
       dragDepth: 0,
       pwaRegistration: null,
       isReloadingForUpdate: false,
@@ -187,8 +183,6 @@ export function createApp({
 
         app.state.layout = nextLayout;
         documentObject.body.dataset.layout = nextLayout;
-        app.layout.syncViewportHeight();
-        app.layout.resetViewportPan();
 
         if (changed) {
           app.ui.renderHistory();
@@ -196,33 +190,6 @@ export function createApp({
         }
 
         app.ui.syncHistoryScroll();
-      },
-
-      syncViewportHeight() {
-        const viewportHeight = app.layout.isMobile()
-          ? windowObject.visualViewport?.height
-          : null;
-
-        if (viewportHeight > 0) {
-          documentObject.documentElement.style.setProperty("--viewport-height", `${viewportHeight}px`);
-          return;
-        }
-
-        documentObject.documentElement.style.removeProperty("--viewport-height");
-      },
-
-      resetViewportPan() {
-        const viewport = windowObject.visualViewport;
-        const scale = viewport?.scale ?? 1;
-        const offsetTop = viewport?.offsetTop ?? 0;
-        const scrollY = windowObject.scrollY ?? 0;
-
-        // iOS pans the visual viewport to reveal the focused field before the
-        // body shrinks to the keyboard-free height, which leaves a gap. Pinch
-        // zoom also pans, so leave anything above scale 1 alone.
-        if (app.layout.isMobile() && scale <= 1 && (offsetTop > 0 || scrollY > 0)) {
-          windowObject.scrollTo(0, 0);
-        }
       },
 
       scheduleApply() {
@@ -239,12 +206,6 @@ export function createApp({
       bind() {
         windowObject.addEventListener("resize", app.layout.scheduleApply, { passive: true });
         windowObject.addEventListener("orientationchange", app.layout.scheduleApply);
-
-        if (windowObject.visualViewport && !app.state.viewportListenerBound) {
-          windowObject.visualViewport.addEventListener("resize", app.layout.scheduleApply, { passive: true });
-          windowObject.visualViewport.addEventListener("scroll", app.layout.scheduleApply, { passive: true });
-          app.state.viewportListenerBound = true;
-        }
       }
     },
 
@@ -281,7 +242,10 @@ export function createApp({
         const isUpdateMode = app.ui.isUpdateMode(mode);
         app.state.buttonMode = mode;
         app.ui.setButtonLabel(app.config.buttonLabels[mode] || app.config.defaultButtonLabel);
-        app.elements.input.disabled = isUpdateMode;
+        app.elements.stage.dataset.mode = mode;
+        // The control is a box while it reads the clipboard and a button otherwise.
+        app.elements.button.classList.toggle("paste-target", mode === "paste");
+        app.elements.button.classList.toggle("push-button", mode !== "paste");
 
         if (isUpdateMode) {
           app.stage.cancel();
@@ -292,7 +256,7 @@ export function createApp({
 
         if (wasUpdateMode) {
           app.elements.status.textContent = app.config.defaultStatus;
-          app.input.refresh();
+          app.stage.setState("idle");
           app.layout.scheduleApply();
         }
       },
@@ -412,7 +376,7 @@ export function createApp({
           return { written };
         }
 
-        app.input.reset({ blur: true });
+        app.input.reset();
         return { written };
       }
     },
@@ -434,6 +398,10 @@ export function createApp({
       play(input, result) {
         app.stage.cancel();
         app.state.stageResult = result;
+
+        if (app.state.buttonMode === "copy") {
+          app.ui.setPrimaryActionMode("paste");
+        }
 
         if (app.stage.prefersReducedMotion()) {
           return;
@@ -466,8 +434,19 @@ export function createApp({
 
       showOutput(isVisible) {
         app.elements.output.hidden = !isVisible;
-        app.elements.stage.classList.toggle("has-output", isVisible);
         app.layout.scheduleApply();
+      },
+
+      selectOutput() {
+        const selection = windowObject.getSelection?.();
+        if (!selection || typeof documentObject.createRange !== "function") {
+          return;
+        }
+
+        const range = documentObject.createRange();
+        range.selectNodeContents(app.elements.output);
+        selection.removeAllRanges();
+        selection.addRange(range);
       },
 
       animate() {
@@ -519,22 +498,32 @@ export function createApp({
         const result = app.state.stageResult;
 
         if (!result.written) {
-          app.stage.cancel();
-          app.input.showCopy(result.output);
+          app.stage.showCopy(result.output);
           return;
         }
 
         if (app.stage.prefersReducedMotion()) {
-          app.input.reset({ blur: true });
+          app.input.reset();
           return;
         }
 
         app.stage.render([{ text: result.output, kind: "same" }]);
         app.stage.setState("done");
-        app.state.animationTimer = windowObject.setTimeout(
-          () => app.input.reset({ blur: true }),
-          app.config.resultHoldMs
-        );
+        app.state.animationTimer = windowObject.setTimeout(app.input.reset, app.config.resultHoldMs);
+      },
+
+      // The clean string stays in the output, selected, with Copy beside it.
+      showCopy(output) {
+        app.stage.cancel();
+
+        if (app.ui.isUpdateMode()) {
+          return;
+        }
+
+        app.stage.render([{ text: output, kind: "same" }]);
+        app.stage.setState("done");
+        app.ui.setPrimaryActionMode("copy");
+        app.stage.selectOutput();
       },
 
       clearTimer() {
@@ -581,8 +570,7 @@ export function createApp({
           ({ written } = await writing);
         } catch (error) {
           if (app.state.stageResult === cleaning) {
-            app.stage.cancel();
-            app.input.refresh();
+            app.input.reset();
           }
 
           throw error;
@@ -619,7 +607,7 @@ export function createApp({
 
       async pasteFromClipboard() {
         if (typeof navigatorObject.clipboard?.readText !== "function") {
-          app.elements.input.focus();
+          app.ui.setStatus("pasteHint");
           return null;
         }
 
@@ -638,7 +626,11 @@ export function createApp({
         );
       },
 
-      handlePaste(event) {
+      handleDocumentPaste(event) {
+        if (event.defaultPrevented || app.input.isEditableTarget(event.target)) {
+          return null;
+        }
+
         const text = event.clipboardData?.getData("text/plain") || "";
         if (!text.trim() || app.ui.isUpdateMode()) {
           return null;
@@ -646,48 +638,6 @@ export function createApp({
 
         event.preventDefault();
         return app.input.guard(() => app.input.clean(text, { source: "paste" }));
-      },
-
-      handleDocumentPaste(event) {
-        if (event.defaultPrevented || app.input.isEditableTarget(event.target)) {
-          return null;
-        }
-
-        return app.input.handlePaste(event);
-      },
-
-      isHoldingResult() {
-        return app.stage.isBusy() && app.state.stageResult.written === true;
-      },
-
-      handleSubmit(event) {
-        event?.preventDefault();
-
-        const text = app.elements.input.value;
-        if (!text.trim() || app.ui.isUpdateMode() || app.input.isHoldingResult()) {
-          return null;
-        }
-
-        return app.input.guard(() => app.input.clean(text, { source: "typed" }));
-      },
-
-      handleKeydown(event) {
-        if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-          return app.input.handleSubmit(event);
-        }
-
-        if (event.key === "Escape" && (app.elements.input.value || app.stage.isBusy())) {
-          event.preventDefault();
-          app.input.reset();
-        }
-
-        return null;
-      },
-
-      handleInput() {
-        app.stage.cancel();
-        app.input.syncHeight();
-        app.input.refresh();
       },
 
       acceptsDrag(event) {
@@ -759,58 +709,15 @@ export function createApp({
         return uri || dataTransfer.getData("text/plain") || "";
       },
 
-      refresh() {
-        if (app.ui.isUpdateMode()) {
-          return;
-        }
-
-        const hasText = app.elements.input.value.trim() !== "";
-        app.ui.setPrimaryActionMode(hasText ? "clean" : "paste");
-        app.stage.setState(hasText ? "editing" : "idle");
-      },
-
-      showCopy(output) {
-        if (app.ui.isUpdateMode()) {
-          return;
-        }
-
-        app.elements.input.value = output;
-        app.input.syncHeight();
-        app.ui.setPrimaryActionMode("copy");
-        app.stage.setState("done");
-        app.elements.input.select();
-      },
-
-      reset({ blur = false } = {}) {
+      reset() {
         app.stage.cancel();
-        app.elements.input.value = "";
-        app.input.syncHeight();
-        app.input.refresh();
 
-        if (blur) {
-          app.elements.input.blur();
-        }
-      },
-
-      syncHeight() {
-        const { input } = app.elements;
-
-        if (!windowObject.CSS?.supports?.("field-sizing", "content")) {
-          input.style.height = "auto";
-          input.style.height = `${input.scrollHeight + input.offsetHeight - input.clientHeight}px`;
+        if (app.ui.isUpdateMode()) {
+          return;
         }
 
-        if (input.offsetHeight !== app.state.inputHeight) {
-          app.state.inputHeight = input.offsetHeight;
-          app.layout.scheduleApply();
-        }
-      },
-
-      focusOnLoad() {
-        const active = documentObject.activeElement;
-        if (!active || active === documentObject.body) {
-          app.elements.input.focus({ preventScroll: true });
-        }
+        app.ui.setPrimaryActionMode("paste");
+        app.stage.setState("idle");
       }
     },
 
@@ -956,16 +863,11 @@ export function createApp({
       bind() {
         app.layout.bind();
 
-        const { button, form, input, output, stage, heroPanel } = app.elements;
+        const { button, output, heroPanel } = app.elements;
 
         button.addEventListener("click", async () => {
           if (app.ui.isUpdateMode()) {
             await app.pwa.activateUpdate();
-            return;
-          }
-
-          if (app.state.buttonMode === "clean") {
-            await app.input.handleSubmit();
             return;
           }
 
@@ -977,21 +879,12 @@ export function createApp({
           await app.input.pasteFromClipboard();
         });
 
-        form.addEventListener("submit", app.input.handleSubmit);
-        input.addEventListener("paste", app.input.handlePaste);
-        input.addEventListener("keydown", app.input.handleKeydown);
-        input.addEventListener("input", app.input.handleInput);
         documentObject.addEventListener("paste", app.input.handleDocumentPaste);
         heroPanel.addEventListener("dragenter", app.input.handleDragEnter);
         heroPanel.addEventListener("dragover", app.input.handleDragOver);
         heroPanel.addEventListener("dragleave", app.input.handleDragLeave);
         heroPanel.addEventListener("drop", app.input.handleDrop);
         output.addEventListener("transitionend", app.stage.handleTransitionEnd);
-        stage.addEventListener("click", (event) => {
-          if (event.target !== input && !input.disabled) {
-            input.focus();
-          }
-        });
 
         windowObject.addEventListener("focus", () => {
           app.pwa.checkForUpdate();
@@ -1048,8 +941,7 @@ export function createApp({
 
       app.dev.installHelpers();
       app.events.bind();
-      app.input.handleInput();
-      app.input.focusOnLoad();
+      app.input.reset();
       await app.pwa.register();
     }
   };

@@ -152,21 +152,30 @@ function createClock() {
   };
 }
 
+function createSelection() {
+  return {
+    ranges: [],
+    removeAllRanges() {
+      this.ranges = [];
+    },
+    addRange(range) {
+      this.ranges.push(range);
+    }
+  };
+}
+
 function createWindowObject({
   innerWidth = 390,
-  visualViewport,
-  scrollY = 0,
   clock = createClock(),
   reducedMotion = false
 } = {}) {
+  const selection = createSelection();
+
   return {
     innerWidth,
-    visualViewport,
-    scrollY,
-    scrollCalls: [],
-    scrollTo(x, y) {
-      this.scrollCalls.push([x, y]);
-      this.scrollY = y;
+    selection,
+    getSelection() {
+      return selection;
     },
     addEventListener() {},
     cancelAnimationFrame() {},
@@ -190,15 +199,13 @@ function createHarness({
   domainSettings = {},
   clipboardText = "",
   innerWidth = 390,
-  visualViewport,
-  scrollY = 0,
   reducedMotion = false,
   navigatorOverrides = {},
   storageOverrides = {}
 } = {}) {
   const documentObject = createAppDocument();
   const clock = createClock();
-  const windowObject = createWindowObject({ innerWidth, visualViewport, scrollY, clock, reducedMotion });
+  const windowObject = createWindowObject({ innerWidth, clock, reducedMotion });
   const historyWrites = [];
   const clipboardWrites = [];
   const errors = [];
@@ -266,8 +273,6 @@ function createAppDocument() {
     "#status-message": new FakeElement("P"),
     "#clean-button": new FakeElement("BUTTON"),
     ".clean-button-label": new FakeElement("SPAN"),
-    "#clean-form": new FakeElement("FORM"),
-    "#clean-input": new FakeElement("TEXTAREA"),
     "#clean-output": new FakeElement("OUTPUT"),
     ".clean-stage": new FakeElement(),
     ".app-panel-hero": new FakeElement(),
@@ -277,6 +282,8 @@ function createAppDocument() {
   };
   const documentObject = new FakeElement("HTML");
   elements["#clean-output"].hidden = true;
+  elements["#clean-button"].classes.add("paste-target");
+  elements["#clean-button"].classes.add("clean-button");
 
   return Object.assign(documentObject, {
     body: {
@@ -302,8 +309,25 @@ function createAppDocument() {
 
     createElement(tagName) {
       return new FakeElement(tagName.toUpperCase());
+    },
+
+    createRange() {
+      return {
+        node: null,
+        selectNodeContents(node) {
+          this.node = node;
+        }
+      };
     }
   });
+}
+
+function pasteOnPage(documentObject, text) {
+  return documentObject.dispatchEvent(createPasteEvent({ "text/plain": text }, { target: new FakeElement("BUTTON") }));
+}
+
+function outputText(output) {
+  return output.children.map((token) => token.textContent).join("");
 }
 
 function createPasteEvent(data, extra = {}) {
@@ -337,23 +361,6 @@ function createDragEvent(type, data) {
       this.defaultPrevented = true;
     }
   };
-}
-
-function createKeyEvent(key, extra = {}) {
-  return {
-    type: "keydown",
-    key,
-    defaultPrevented: false,
-    preventDefault() {
-      this.defaultPrevented = true;
-    },
-    ...extra
-  };
-}
-
-async function typeInto(input, value) {
-  input.value = value;
-  await input.dispatchEvent({ type: "input" });
 }
 
 test("app module can be imported without browser DOM side effects", () => {
@@ -585,124 +592,62 @@ test("app reports unexpected clipboard failures and restores the primary button"
   assert.equal(errors.length, 1);
 });
 
-test("app cleans text pasted into the field instead of inserting it", async () => {
-  const { app, documentObject, clipboardWrites, historyWrites } = createHarness();
-  const input = documentObject.querySelector("#clean-input");
-  const paste = createPasteEvent({
-    "text/plain": "https://example.com/path?utm_source=newsletter&keep=1"
-  });
+test("app shows the paste target in idle with its label and the paste mode", async () => {
+  const { app, documentObject } = createHarness();
+  const button = documentObject.querySelector("#clean-button");
+  const stage = documentObject.querySelector(".clean-stage");
 
   await app.init();
-  await input.dispatchEvent(paste);
 
-  assert.equal(paste.defaultPrevented, true);
-  assert.deepEqual(clipboardWrites, ["https://example.com/path?keep=1"]);
-  assert.equal(app.state.historyEntries[0].url, "https://example.com/path?keep=1");
-  assert.equal(historyWrites.length, 1);
-  assert.equal(documentObject.querySelector("#status-message").textContent, "All clear!");
-  assert.equal(input.value, "");
+  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Paste a link here");
+  assert.equal(app.state.buttonMode, "paste");
+  assert.equal(stage.dataset.state, "idle");
+  assert.equal(stage.dataset.mode, "paste");
+  assert.equal(button.classes.has("paste-target"), true);
+  assert.equal(button.classes.has("push-button"), false);
+  assert.equal(documentObject.querySelector("#clean-output").hidden, true);
 });
 
 test("app cleans document pastes outside editable elements and ignores the rest", async () => {
-  const { app, documentObject, clipboardWrites } = createHarness();
-  const text = { "text/plain": "HELLO   WORLD." };
+  const { app, documentObject, clipboardWrites, historyWrites } = createHarness();
+  const text = { "text/plain": "https://example.com/path?utm_source=newsletter&keep=1" };
 
   await app.init();
 
   const pageTarget = createPasteEvent(text, { target: new FakeElement("BUTTON") });
   await documentObject.dispatchEvent(pageTarget);
   assert.equal(pageTarget.defaultPrevented, true);
-  assert.deepEqual(clipboardWrites, ["Hello world."]);
+  assert.deepEqual(clipboardWrites, ["https://example.com/path?keep=1"]);
+  assert.equal(app.state.historyEntries[0].url, "https://example.com/path?keep=1");
+  assert.equal(historyWrites.length, 1);
+  assert.equal(documentObject.querySelector("#status-message").textContent, "All clear!");
 
   const otherField = createPasteEvent(text, { target: new FakeElement("INPUT") });
   const editableRegion = createPasteEvent(text, { target: { isContentEditable: true } });
-  const mainField = createPasteEvent(text, { target: documentObject.querySelector("#clean-input") });
+  const handled = createPasteEvent(text, { target: new FakeElement("BUTTON"), defaultPrevented: true });
   await documentObject.dispatchEvent(otherField);
   await documentObject.dispatchEvent(editableRegion);
-  await documentObject.dispatchEvent(mainField);
+  await documentObject.dispatchEvent(handled);
 
   assert.equal(otherField.defaultPrevented, false);
   assert.equal(editableRegion.defaultPrevented, false);
-  assert.equal(mainField.defaultPrevented, false);
-  assert.deepEqual(clipboardWrites, ["Hello world."]);
+  assert.deepEqual(clipboardWrites, ["https://example.com/path?keep=1"]);
 });
 
-test("app labels the button Paste when the field is empty and Clean once it has typed text", async () => {
-  let readCalls = 0;
-  const clipboardWrites = [];
-  const { app, documentObject, clock } = createHarness({
-    navigatorOverrides: {
-      clipboard: {
-        async readText() {
-          readCalls += 1;
-          return "";
-        },
-
-        async writeText(value) {
-          clipboardWrites.push(value);
-        }
-      }
-    }
-  });
-  const input = documentObject.querySelector("#clean-input");
-  const label = documentObject.querySelector(".clean-button-label");
+test("app leaves whitespace-only document pastes to the browser", async () => {
+  const { app, documentObject, clipboardWrites } = createHarness();
+  const status = documentObject.querySelector("#status-message");
   const stage = documentObject.querySelector(".clean-stage");
+  const pagePaste = createPasteEvent({ "text/plain": "  \n\t " }, { target: new FakeElement("BUTTON") });
 
   await app.init();
-  assert.equal(label.textContent, "Paste");
-  assert.equal(stage.dataset.state, "idle");
+  const statusBefore = status.textContent;
+  await documentObject.dispatchEvent(pagePaste);
 
-  await typeInto(input, "HELLO   WORLD.");
-  assert.equal(label.textContent, "Clean");
-  assert.equal(app.state.buttonMode, "clean");
-  assert.equal(stage.dataset.state, "editing");
-
-  await documentObject.querySelector("#clean-button").dispatchEvent({ type: "click" });
-
-  assert.equal(readCalls, 0);
-  assert.deepEqual(clipboardWrites, ["Hello world."]);
-
-  await clock.advance(app.config.animationTimeoutMs + app.config.resultHoldMs);
-  assert.equal(label.textContent, "Paste");
-  assert.equal(stage.dataset.state, "idle");
-});
-
-test("app cleans the typed value on Enter and empties the field on Escape", async () => {
-  const { app, documentObject, clipboardWrites } = createHarness();
-  const input = documentObject.querySelector("#clean-input");
-
-  await app.init();
-
-  await typeInto(input, "first line");
-  const shiftEnter = createKeyEvent("Enter", { shiftKey: true });
-  await input.dispatchEvent(shiftEnter);
-  assert.equal(shiftEnter.defaultPrevented, false);
+  assert.equal(pagePaste.defaultPrevented, false);
   assert.deepEqual(clipboardWrites, []);
-
-  const enter = createKeyEvent("Enter");
-  await input.dispatchEvent(enter);
-  assert.equal(enter.defaultPrevented, true);
-  assert.deepEqual(clipboardWrites, ["first line"]);
-
-  await typeInto(input, "never cleaned");
-  const escape = createKeyEvent("Escape");
-  await input.dispatchEvent(escape);
-  assert.equal(escape.defaultPrevented, true);
-  assert.equal(input.value, "");
-  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Paste");
-  assert.deepEqual(clipboardWrites, ["first line"]);
-});
-
-test("app keeps the form from submitting natively", async () => {
-  const { app, documentObject, clipboardWrites } = createHarness();
-  const submit = createKeyEvent("Enter", { type: "submit" });
-
-  await app.init();
-  await typeInto(documentObject.querySelector("#clean-input"), "typed text");
-  await documentObject.querySelector("#clean-form").dispatchEvent(submit);
-
-  assert.equal(submit.defaultPrevented, true);
-  assert.deepEqual(clipboardWrites, ["typed text"]);
+  assert.equal(status.textContent, statusBefore);
+  assert.equal(stage.dataset.state, "idle");
 });
 
 test("app cleans dropped links, preferring text/uri-list over text/plain", async () => {
@@ -739,99 +684,46 @@ test("app cleans dropped links, preferring text/uri-list over text/plain", async
   assert.equal(files.defaultPrevented, false);
 });
 
-test("app holds the clean string after the animation, then empties and blurs the field", async () => {
-  const { app, documentObject, clipboardWrites, clock } = createHarness();
-  const input = documentObject.querySelector("#clean-input");
+test("app hides the target behind the output, holds the clean string, then returns to idle", async () => {
+  const { app, documentObject, clipboardWrites, clock } = createHarness({
+    clipboardText: "https://example.com/?gclid=1"
+  });
+  const button = documentObject.querySelector("#clean-button");
   const output = documentObject.querySelector("#clean-output");
   const stage = documentObject.querySelector(".clean-stage");
   const label = documentObject.querySelector(".clean-button-label");
 
   await app.init();
-  assert.equal(input.focused, true);
-
-  await typeInto(input, "https://example.com/?gclid=1");
-  await input.dispatchEvent(createKeyEvent("Enter"));
+  await button.dispatchEvent({ type: "click" });
 
   assert.deepEqual(clipboardWrites, ["https://example.com/"]);
   assert.equal(stage.dataset.state, "cleaning");
-  assert.equal(input.focused, true);
+  assert.equal(stage.dataset.mode, "paste");
+  assert.equal(output.hidden, false);
+  assert.equal(button.disabled, false);
 
   await output.dispatchEvent({ type: "transitionend", propertyName: "color" });
   assert.equal(stage.dataset.state, "cleaning");
 
   await output.dispatchEvent({ type: "transitionend", propertyName: "font-size" });
   assert.equal(stage.dataset.state, "done");
+  assert.equal(stage.dataset.mode, "paste");
   assert.equal(output.hidden, false);
   assert.equal(output.classes.has("is-animating"), false);
   assert.deepEqual(output.children.map((token) => token.textContent), ["https://example.com/"]);
-  assert.equal(input.focused, true);
-  assert.equal(label.textContent, "Clean");
+  assert.equal(label.textContent, "Paste a link here");
 
   await clock.advance(app.config.resultHoldMs - 1);
   assert.equal(stage.dataset.state, "done");
-  assert.equal(input.value, "https://example.com/?gclid=1");
 
   await clock.advance(1);
-  assert.equal(input.value, "");
-  assert.equal(input.focused, false);
   assert.equal(output.hidden, true);
   assert.deepEqual(output.children, []);
-  assert.equal(stage.classes.has("has-output"), false);
-  assert.equal(label.textContent, "Paste");
+  assert.equal(label.textContent, "Paste a link here");
   assert.equal(stage.dataset.state, "idle");
+  assert.equal(stage.dataset.mode, "paste");
+  assert.equal(button.classes.has("paste-target"), true);
   assert.equal(clock.pending, 0);
-});
-
-test("app ignores Clean and Enter while a written result holds in the output", async () => {
-  const { app, documentObject, clipboardWrites, clock } = createHarness();
-  const input = documentObject.querySelector("#clean-input");
-  const button = documentObject.querySelector("#clean-button");
-  const stage = documentObject.querySelector(".clean-stage");
-  const label = documentObject.querySelector(".clean-button-label");
-
-  await app.init();
-  await typeInto(input, "https://example.com/?gclid=1");
-  await input.dispatchEvent(createKeyEvent("Enter"));
-  await clock.advance(app.config.animationTimeoutMs);
-
-  assert.equal(stage.dataset.state, "done");
-  assert.equal(label.textContent, "Clean");
-  assert.deepEqual(clipboardWrites, ["https://example.com/"]);
-
-  await button.dispatchEvent({ type: "click" });
-  const enter = createKeyEvent("Enter");
-  await input.dispatchEvent(enter);
-
-  assert.equal(enter.defaultPrevented, true);
-  assert.deepEqual(clipboardWrites, ["https://example.com/"]);
-  assert.equal(stage.dataset.state, "done");
-  assert.equal(clock.pending, 1);
-
-  await clock.advance(app.config.resultHoldMs);
-  assert.equal(stage.dataset.state, "idle");
-  assert.equal(input.value, "");
-  assert.equal(label.textContent, "Paste");
-  assert.equal(clock.pending, 0);
-});
-
-test("app leaves whitespace-only pastes to the browser", async () => {
-  const { app, documentObject, clipboardWrites } = createHarness();
-  const input = documentObject.querySelector("#clean-input");
-  const status = documentObject.querySelector("#status-message");
-  const stage = documentObject.querySelector(".clean-stage");
-  const fieldPaste = createPasteEvent({ "text/plain": "  \n\t " });
-  const pagePaste = createPasteEvent({ "text/plain": "   " }, { target: new FakeElement("BUTTON") });
-
-  await app.init();
-  const statusBefore = status.textContent;
-  await input.dispatchEvent(fieldPaste);
-  await documentObject.dispatchEvent(pagePaste);
-
-  assert.equal(fieldPaste.defaultPrevented, false);
-  assert.equal(pagePaste.defaultPrevented, false);
-  assert.deepEqual(clipboardWrites, []);
-  assert.equal(status.textContent, statusBefore);
-  assert.equal(stage.dataset.state, "idle");
 });
 
 test("app renders the transformation as text spans after the write-back has started", async () => {
@@ -851,7 +743,6 @@ test("app renders the transformation as text spans after the write-back has star
   });
   documentObject = harness.documentObject;
   const { app } = harness;
-  const input = documentObject.querySelector("#clean-input");
   const output = documentObject.querySelector("#clean-output");
   const stage = documentObject.querySelector(".clean-stage");
   const historySection = documentObject.querySelector(".history-section");
@@ -860,11 +751,10 @@ test("app renders the transformation as text spans after the write-back has star
   historySection.scrollHeight = 500;
   historySection.clientHeight = 200;
   historySection.scrollTop = 0;
-  await input.dispatchEvent(createPasteEvent({ "text/plain": "<b>x</b>   y" }));
+  await pasteOnPage(documentObject, "<b>x</b>   y");
 
   assert.deepEqual(clipboardWrites, ["<b>x</b> y"]);
   assert.equal(stage.dataset.state, "cleaning");
-  assert.equal(stage.classes.has("has-output"), true);
   assert.equal(output.hidden, false);
   assert.equal(output.classes.has("is-animating"), true);
   assert.equal(output.innerHTML, "");
@@ -878,29 +768,25 @@ test("app renders the transformation as text spans after the write-back has star
     ]
   );
   assert.equal(historySection.scrollTop, 500);
-  assert.equal(input.focused, true);
 });
 
 test("app finishes the stage immediately when the injected matchMedia reports reduced motion", async () => {
   const { app, documentObject, clipboardWrites, clock } = createHarness({ reducedMotion: true });
-  const input = documentObject.querySelector("#clean-input");
   const output = documentObject.querySelector("#clean-output");
   const status = documentObject.querySelector("#status-message");
 
   await app.init();
-  await typeInto(input, "https://example.com/?utm_source=x");
-  await input.dispatchEvent(createKeyEvent("Enter"));
+  await pasteOnPage(documentObject, "https://example.com/?utm_source=x");
 
   assert.deepEqual(clipboardWrites, ["https://example.com/"]);
   assert.equal(output.hidden, true);
   assert.deepEqual(output.children, []);
-  assert.equal(input.value, "");
-  assert.equal(input.focused, false);
   assert.equal(app.state.stage, "idle");
-  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Paste");
+  assert.equal(app.state.buttonMode, "paste");
+  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Paste a link here");
   assert.equal(clock.pending, 0);
 
-  await input.dispatchEvent(createPasteEvent({ "text/plain": "https://example.com/path?keep=ok" }));
+  await pasteOnPage(documentObject, "https://example.com/path?keep=ok");
   assert.equal(status.textContent, "All clear!");
   assert.equal(status.classes.has("is-pulsing"), false);
   assert.equal(output.hidden, true);
@@ -909,32 +795,32 @@ test("app finishes the stage immediately when the injected matchMedia reports re
 
 test("app shows Copy immediately under reduced motion when the write-back is refused", async () => {
   const clipboardWrites = [];
-  const { app, documentObject, clock } = createHarness({
+  const { app, documentObject, windowObject, clock } = createHarness({
     reducedMotion: true,
     navigatorOverrides: {
       clipboard: createRefusingClipboard({ clipboardWrites })
     }
   });
-  const input = documentObject.querySelector("#clean-input");
+  const output = documentObject.querySelector("#clean-output");
 
   await app.init();
-  await input.dispatchEvent(createPasteEvent({ "text/plain": "https://example.com/?utm_source=x&keep=1" }));
+  await pasteOnPage(documentObject, "https://example.com/?utm_source=x&keep=1");
 
   assert.equal(app.state.buttonMode, "copy");
   assert.equal(app.state.stage, "done");
-  assert.equal(input.value, "https://example.com/?keep=1");
-  assert.equal(input.selected, true);
-  assert.equal(documentObject.querySelector("#clean-output").hidden, true);
+  assert.equal(output.hidden, false);
+  assert.equal(outputText(output), "https://example.com/?keep=1");
+  assert.equal(windowObject.selection.ranges.length, 1);
+  assert.equal(windowObject.selection.ranges[0].node, output);
   assert.equal(clock.pending, 0);
 });
 
 test("app ends the animation after 600 ms when transitionend never fires", async () => {
   const { app, documentObject, clock } = createHarness();
-  const input = documentObject.querySelector("#clean-input");
   const stage = documentObject.querySelector(".clean-stage");
 
   await app.init();
-  await input.dispatchEvent(createPasteEvent({ "text/plain": "https://example.com/?utm_source=x" }));
+  await pasteOnPage(documentObject, "https://example.com/?utm_source=x");
 
   await clock.advance(599);
   assert.equal(stage.dataset.state, "cleaning");
@@ -946,23 +832,20 @@ test("app ends the animation after 600 ms when transitionend never fires", async
 
   await clock.advance(app.config.resultHoldMs);
   assert.equal(stage.dataset.state, "idle");
-  assert.equal(input.focused, false);
   assert.equal(clock.pending, 0);
 });
 
 test("app cancels the pending animation and hold when a second paste arrives", async () => {
   const { app, documentObject, clipboardWrites, clock } = createHarness();
-  const input = documentObject.querySelector("#clean-input");
   const output = documentObject.querySelector("#clean-output");
   const stage = documentObject.querySelector(".clean-stage");
-  const text = (element) => element.children.map((token) => token.textContent).join("");
 
   await app.init();
-  await input.dispatchEvent(createPasteEvent({ "text/plain": "https://example.com/a?fbclid=1" }));
+  await pasteOnPage(documentObject, "https://example.com/a?fbclid=1");
   await clock.advance(300);
 
-  await input.dispatchEvent(createPasteEvent({ "text/plain": "https://example.com/b?gclid=2" }));
-  assert.equal(text(output), "https://example.com/b?gclid=2");
+  await pasteOnPage(documentObject, "https://example.com/b?gclid=2");
+  assert.equal(outputText(output), "https://example.com/b?gclid=2");
   assert.equal(stage.dataset.state, "cleaning");
   assert.equal(clock.pending, 1);
 
@@ -970,12 +853,9 @@ test("app cancels the pending animation and hold when a second paste arrives", a
   assert.equal(stage.dataset.state, "cleaning");
   await clock.advance(1);
   assert.equal(stage.dataset.state, "done");
-  assert.equal(text(output), "https://example.com/b");
+  assert.equal(outputText(output), "https://example.com/b");
 
-  await documentObject.dispatchEvent(createPasteEvent(
-    { "text/plain": "HELLO   WORLD." },
-    { target: new FakeElement("BUTTON") }
-  ));
+  await pasteOnPage(documentObject, "HELLO   WORLD.");
   assert.equal(stage.dataset.state, "cleaning");
   assert.equal(clock.pending, 1);
 
@@ -987,60 +867,34 @@ test("app cancels the pending animation and hold when a second paste arrives", a
   assert.equal(clock.pending, 0);
 });
 
-test("app cancels the stage on Escape and on a switch to update mode", async () => {
+test("app cancels the stage on a switch to update mode and returns to idle afterwards", async () => {
   const { app, documentObject, clock } = createHarness();
-  const input = documentObject.querySelector("#clean-input");
   const output = documentObject.querySelector("#clean-output");
   const stage = documentObject.querySelector(".clean-stage");
 
   await app.init();
-  await input.dispatchEvent(createPasteEvent({ "text/plain": "https://example.com/?utm_source=x" }));
-  const escape = createKeyEvent("Escape");
-  await input.dispatchEvent(escape);
-
-  assert.equal(escape.defaultPrevented, true);
-  assert.equal(stage.dataset.state, "idle");
-  assert.equal(output.hidden, true);
-  assert.equal(input.focused, true);
-  assert.equal(clock.pending, 0);
-
-  await input.dispatchEvent(createPasteEvent({ "text/plain": "https://example.com/?utm_source=y" }));
+  await pasteOnPage(documentObject, "https://example.com/?utm_source=y");
   await clock.advance(app.config.animationTimeoutMs);
   assert.equal(stage.dataset.state, "done");
 
   app.pwa.bindRegistration(createWaitingRegistration());
   assert.equal(stage.dataset.state, "update");
+  assert.equal(stage.dataset.mode, "update");
   assert.equal(output.hidden, true);
   assert.equal(clock.pending, 0);
 
   app.ui.setPrimaryActionMode("paste");
   assert.equal(stage.dataset.state, "idle");
-});
-
-test("app restores the field when typing interrupts the stage", async () => {
-  const { app, documentObject, clock } = createHarness();
-  const input = documentObject.querySelector("#clean-input");
-  const output = documentObject.querySelector("#clean-output");
-
-  await app.init();
-  await typeInto(input, "https://example.com/?utm_source=x");
-  await input.dispatchEvent(createKeyEvent("Enter"));
-  await typeInto(input, "https://example.com/?utm_source=x&more");
-
-  assert.equal(output.hidden, true);
-  assert.equal(app.state.stage, "editing");
-  assert.equal(app.state.buttonMode, "clean");
-  assert.equal(clock.pending, 0);
+  assert.equal(stage.dataset.mode, "paste");
 });
 
 test("app skips the collapse for unchanged results and pulses the status", async () => {
   const { app, documentObject, clock } = createHarness();
-  const input = documentObject.querySelector("#clean-input");
   const output = documentObject.querySelector("#clean-output");
   const status = documentObject.querySelector("#status-message");
 
   await app.init();
-  await input.dispatchEvent(createPasteEvent({ "text/plain": "https://example.com/path?keep=ok" }));
+  await pasteOnPage(documentObject, "https://example.com/path?keep=ok");
 
   assert.equal(output.classes.has("is-animating"), false);
   assert.deepEqual(output.children.map((token) => token.className), ["tok tok-same"]);
@@ -1063,15 +917,13 @@ test("app clears the stage when the write-back fails unexpectedly", async () => 
       }
     }
   });
-  const input = documentObject.querySelector("#clean-input");
 
   await app.init();
-  await typeInto(input, "https://example.com/?utm_source=x");
-  await input.dispatchEvent(createKeyEvent("Enter"));
+  await pasteOnPage(documentObject, "https://example.com/?utm_source=x");
 
   assert.equal(documentObject.querySelector("#clean-output").hidden, true);
-  assert.equal(app.state.stage, "editing");
-  assert.equal(input.value, "https://example.com/?utm_source=x");
+  assert.equal(app.state.stage, "idle");
+  assert.equal(app.state.buttonMode, "paste");
   assert.equal(
     documentObject.querySelector("#status-message").textContent,
     "Something went sideways while cleaning your clipboard."
@@ -1080,42 +932,28 @@ test("app clears the stage when the write-back fails unexpectedly", async () => 
   assert.equal(clock.pending, 0);
 });
 
-test("app focuses the field when the paste button cannot read the clipboard", async () => {
-  const { app, documentObject, errors } = createHarness({
+test("app shows the keyboard hint when the target cannot read the clipboard", async () => {
+  const { app, documentObject, errors, clock } = createHarness({
     navigatorOverrides: {
       clipboard: {}
     }
   });
-  const input = documentObject.querySelector("#clean-input");
+  const button = documentObject.querySelector("#clean-button");
+  const stage = documentObject.querySelector(".clean-stage");
 
   await app.init();
-  const status = documentObject.querySelector("#status-message");
-  status.textContent = app.config.defaultStatus;
-  input.blur();
-  await documentObject.querySelector("#clean-button").dispatchEvent({ type: "click" });
+  await button.dispatchEvent({ type: "click" });
 
-  assert.equal(input.focused, true);
-  assert.equal(status.textContent, "Remove junk parameters from any URL you paste, type or drop in.");
+  assert.equal(
+    documentObject.querySelector("#status-message").textContent,
+    "Press Cmd+V or Ctrl+V to paste a link."
+  );
+  assert.equal(button.disabled, false);
+  assert.equal(stage.dataset.state, "idle");
+  assert.equal(app.state.buttonMode, "paste");
+  assert.equal(documentObject.querySelector("#clean-output").hidden, true);
+  assert.equal(clock.pending, 0);
   assert.deepEqual(errors, []);
-});
-
-test("app syncs the field height and keeps the newest mobile entry in view when the field grows", async () => {
-  const { app, documentObject } = createHarness();
-  const input = documentObject.querySelector("#clean-input");
-  const historySection = documentObject.querySelector(".history-section");
-
-  await app.init();
-  historySection.scrollHeight = 500;
-  historySection.clientHeight = 200;
-  historySection.scrollTop = 0;
-
-  input.scrollHeight = 88;
-  input.clientHeight = 88;
-  input.offsetHeight = 90;
-  await typeInto(input, "a\nb\nc");
-
-  assert.equal(input.style.height, "90px");
-  assert.equal(historySection.scrollTop, 500);
 });
 
 function createRefusingClipboard({ refusals = 1, clipboardWrites }) {
@@ -1139,103 +977,118 @@ function createRefusingClipboard({ refusals = 1, clipboardWrites }) {
   };
 }
 
-test("app switches the button to Copy when the clipboard write-back is refused", async () => {
+test("app switches the control to Copy beside the selected output when the write-back is refused", async () => {
   const clipboardWrites = [];
-  const { app, documentObject, errors, clock } = createHarness({
+  const { app, documentObject, windowObject, errors, clock } = createHarness({
     navigatorOverrides: {
       clipboard: createRefusingClipboard({ clipboardWrites })
     }
   });
-  const input = documentObject.querySelector("#clean-input");
+  const button = documentObject.querySelector("#clean-button");
+  const output = documentObject.querySelector("#clean-output");
+  const stage = documentObject.querySelector(".clean-stage");
 
   await app.init();
-  await input.dispatchEvent(createPasteEvent({ "text/plain": "https://example.com/?utm_source=x&keep=1" }));
+  await pasteOnPage(documentObject, "https://example.com/?utm_source=x&keep=1");
   assert.equal(app.state.stage, "cleaning");
   assert.equal(app.state.buttonMode, "paste");
 
   await clock.advance(app.config.animationTimeoutMs);
   assert.deepEqual(clipboardWrites, []);
-  assert.equal(documentObject.querySelector("#clean-output").hidden, true);
   assert.equal(clock.pending, 0);
   assert.equal(app.state.buttonMode, "copy");
   assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Copy");
   assert.equal(documentObject.querySelector("#status-message").textContent, "All clear!");
-  assert.equal(documentObject.querySelector(".clean-stage").dataset.state, "done");
-  assert.equal(input.value, "https://example.com/?keep=1");
-  assert.equal(input.selected, true);
+  assert.equal(stage.dataset.state, "done");
+  assert.equal(stage.dataset.mode, "copy");
+  assert.equal(button.classes.has("push-button"), true);
+  assert.equal(button.classes.has("paste-target"), false);
+  assert.equal(output.hidden, false);
+  assert.equal(output.classes.has("is-animating"), false);
+  assert.equal(outputText(output), "https://example.com/?keep=1");
+  assert.equal(windowObject.selection.ranges.length, 1);
+  assert.equal(windowObject.selection.ranges[0].node, output);
   assert.equal(app.state.historyEntries[0].url, "https://example.com/?keep=1");
   assert.deepEqual(errors, []);
 });
 
-test("app writes the last result when Copy is tapped, then empties the field and returns to Paste", async () => {
+test("app writes the last result when Copy is tapped, then empties the output and returns to the target", async () => {
   const clipboardWrites = [];
   const { app, documentObject, clock } = createHarness({
     navigatorOverrides: {
       clipboard: createRefusingClipboard({ clipboardWrites })
     }
   });
-  const input = documentObject.querySelector("#clean-input");
   const button = documentObject.querySelector("#clean-button");
+  const output = documentObject.querySelector("#clean-output");
+  const stage = documentObject.querySelector(".clean-stage");
 
   await app.init();
-  await typeInto(input, "HELLO   WORLD.");
-  await input.dispatchEvent(createKeyEvent("Enter"));
+  await pasteOnPage(documentObject, "HELLO   WORLD.");
   await clock.advance(app.config.animationTimeoutMs);
-  assert.equal(input.value, "Hello world.");
+  assert.equal(outputText(output), "Hello world.");
 
   await button.dispatchEvent({ type: "click" });
 
   assert.deepEqual(clipboardWrites, ["Hello world."]);
-  assert.equal(input.value, "");
-  assert.equal(input.focused, false);
+  assert.equal(output.hidden, true);
+  assert.deepEqual(output.children, []);
   assert.equal(app.state.buttonMode, "paste");
-  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Paste");
-  assert.equal(documentObject.querySelector(".clean-stage").dataset.state, "idle");
+  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Paste a link here");
+  assert.equal(stage.dataset.state, "idle");
+  assert.equal(stage.dataset.mode, "paste");
+  assert.equal(button.classes.has("paste-target"), true);
+  assert.equal(button.classes.has("push-button"), false);
   assert.equal(documentObject.querySelector("#status-message").textContent, "All clear!");
 });
 
-test("app keeps the Copy button and reports the block when Copy is refused too", async () => {
+test("app keeps the Copy control and reports the block when Copy is refused too", async () => {
   const clipboardWrites = [];
   const { app, documentObject } = createHarness({
     navigatorOverrides: {
       clipboard: createRefusingClipboard({ refusals: 2, clipboardWrites })
     }
   });
-  const input = documentObject.querySelector("#clean-input");
+  const output = documentObject.querySelector("#clean-output");
 
   await app.init();
-  await input.dispatchEvent(createPasteEvent({ "text/plain": "plain text" }));
+  await pasteOnPage(documentObject, "plain text");
   await documentObject.querySelector("#clean-button").dispatchEvent({ type: "click" });
 
   assert.deepEqual(clipboardWrites, []);
   assert.equal(app.state.buttonMode, "copy");
-  assert.equal(input.value, "plain text");
+  assert.equal(output.hidden, false);
+  assert.equal(outputText(output), "plain text");
   assert.equal(
     documentObject.querySelector("#status-message").textContent,
     "Clipboard access is blocked. Try allowing clipboard permissions."
   );
 });
 
-test("app leaves Copy mode when the field is edited or emptied", async () => {
+test("app leaves Copy mode when a new paste replaces the held result", async () => {
   const clipboardWrites = [];
-  const { app, documentObject } = createHarness({
+  const { app, documentObject, clock } = createHarness({
     navigatorOverrides: {
       clipboard: createRefusingClipboard({ clipboardWrites })
     }
   });
-  const input = documentObject.querySelector("#clean-input");
+  const output = documentObject.querySelector("#clean-output");
+  const stage = documentObject.querySelector(".clean-stage");
 
   await app.init();
-  await input.dispatchEvent(createPasteEvent({ "text/plain": "plain text" }));
+  await pasteOnPage(documentObject, "plain text");
   assert.equal(app.state.buttonMode, "copy");
 
-  await typeInto(input, "plain text, edited");
-  assert.equal(app.state.buttonMode, "clean");
-  assert.equal(documentObject.querySelector(".clean-stage").dataset.state, "editing");
-
-  await input.dispatchEvent(createKeyEvent("Escape"));
+  await pasteOnPage(documentObject, "https://example.com/?utm_source=x");
   assert.equal(app.state.buttonMode, "paste");
-  assert.equal(input.value, "");
+  assert.equal(stage.dataset.mode, "paste");
+  assert.equal(stage.dataset.state, "cleaning");
+  assert.deepEqual(clipboardWrites, ["https://example.com/"]);
+
+  await clock.advance(app.config.animationTimeoutMs + app.config.resultHoldMs);
+  assert.equal(stage.dataset.state, "idle");
+  assert.equal(output.hidden, true);
+  assert.equal(clock.pending, 0);
 });
 
 test("app renders history newest-first on desktop and newest-near-action on mobile", async () => {
@@ -1267,112 +1120,6 @@ test("app renders history newest-first on desktop and newest-near-action on mobi
     mobileHarness.documentObject.querySelector("#history-list").children.map((item) => item.children[0].href),
     ["https://example.com/older", "https://example.com/newer"]
   );
-});
-
-test("app sizes the mobile column from the visual viewport and clears it on desktop", async () => {
-  const mobileHarness = createHarness({
-    innerWidth: 390,
-    visualViewport: {
-      height: 512.5,
-      addEventListener() {}
-    }
-  });
-  await mobileHarness.app.init();
-  assert.equal(
-    mobileHarness.documentObject.documentElement.style.properties.get("--viewport-height"),
-    "512.5px"
-  );
-
-  const desktopHarness = createHarness({
-    innerWidth: 1440,
-    visualViewport: {
-      height: 900,
-      addEventListener() {}
-    }
-  });
-  await desktopHarness.app.init();
-  assert.equal(
-    desktopHarness.documentObject.documentElement.style.properties.has("--viewport-height"),
-    false
-  );
-
-  const noViewportHarness = createHarness({ innerWidth: 390 });
-  await noViewportHarness.app.init();
-  assert.equal(
-    noViewportHarness.documentObject.documentElement.style.properties.has("--viewport-height"),
-    false
-  );
-});
-
-function createVisualViewport({ height = 512, offsetTop = 0, scale = 1 } = {}) {
-  return {
-    height,
-    offsetTop,
-    scale,
-    listeners: [],
-    addEventListener(type, handler, options) {
-      this.listeners.push({ type, handler, options });
-    }
-  };
-}
-
-test("app scrolls the window back to the origin when the keyboard pans the visual viewport", async () => {
-  const panned = createHarness({
-    innerWidth: 390,
-    visualViewport: createVisualViewport({ offsetTop: 318 })
-  });
-  await panned.app.init();
-  assert.deepEqual(panned.windowObject.scrollCalls, [[0, 0]]);
-
-  panned.windowObject.visualViewport.offsetTop = 0;
-  panned.app.layout.apply();
-  assert.deepEqual(panned.windowObject.scrollCalls, [[0, 0]]);
-
-  const scrolled = createHarness({
-    innerWidth: 390,
-    scrollY: 120,
-    visualViewport: createVisualViewport()
-  });
-  await scrolled.app.init();
-  assert.deepEqual(scrolled.windowObject.scrollCalls, [[0, 0]]);
-
-  const zoomed = createHarness({
-    innerWidth: 390,
-    visualViewport: createVisualViewport({ offsetTop: 318, scale: 2 })
-  });
-  await zoomed.app.init();
-  assert.deepEqual(zoomed.windowObject.scrollCalls, []);
-
-  const desktop = createHarness({
-    innerWidth: 1440,
-    visualViewport: createVisualViewport({ height: 900, offsetTop: 318 })
-  });
-  await desktop.app.init();
-  assert.deepEqual(desktop.windowObject.scrollCalls, []);
-
-  const resting = createHarness({
-    innerWidth: 390,
-    visualViewport: createVisualViewport()
-  });
-  await resting.app.init();
-  assert.deepEqual(resting.windowObject.scrollCalls, []);
-});
-
-test("app re-applies the layout on visual viewport resize and scroll", async () => {
-  const { app, windowObject } = createHarness({
-    innerWidth: 390,
-    visualViewport: createVisualViewport()
-  });
-  await app.init();
-
-  const bound = windowObject.visualViewport.listeners;
-  assert.deepEqual(bound.map((entry) => entry.type), ["resize", "scroll"]);
-  assert.ok(bound.every((entry) => entry.handler === app.layout.scheduleApply));
-  assert.ok(bound.every((entry) => entry.options?.passive === true));
-
-  windowObject.visualViewport.offsetTop = 200;
-  await bound[1].handler();
-  assert.deepEqual(windowObject.scrollCalls, [[0, 0]]);
 });
 
 test("app shares saved history entries when the Web Share API can share them", async () => {
@@ -1508,28 +1255,21 @@ function createWaitingRegistration() {
   };
 }
 
-test("app ignores pastes, drops, and Enter in update mode", async () => {
+test("app ignores pastes and drops in update mode", async () => {
   const { app, documentObject, clipboardWrites } = createHarness();
-  const input = documentObject.querySelector("#clean-input");
   const status = documentObject.querySelector("#status-message");
 
   await app.init();
-  await typeInto(input, "typed before the update");
   app.pwa.bindRegistration(createWaitingRegistration());
 
-  const fieldPaste = createPasteEvent({ "text/plain": "https://example.com/?utm_source=x" });
   const documentPaste = createPasteEvent(
     { "text/plain": "https://example.com/?utm_source=x" },
     { target: new FakeElement("BUTTON") }
   );
   const drop = createDragEvent("drop", { "text/plain": "https://example.com/?utm_source=x" });
-  const enter = createKeyEvent("Enter");
-  await input.dispatchEvent(fieldPaste);
   await documentObject.dispatchEvent(documentPaste);
   await documentObject.querySelector(".app-panel-hero").dispatchEvent(drop);
-  await input.dispatchEvent(enter);
 
-  assert.equal(fieldPaste.defaultPrevented, false);
   assert.equal(documentPaste.defaultPrevented, false);
   assert.equal(drop.defaultPrevented, false);
   assert.deepEqual(clipboardWrites, []);
@@ -1537,42 +1277,41 @@ test("app ignores pastes, drops, and Enter in update mode", async () => {
   assert.equal(status.textContent, "A new version for this app is available online.");
 });
 
-test("app disables the field in update mode and restores it on return to clean mode", async () => {
+test("app turns the target into a full-row button in update mode and restores it afterwards", async () => {
   const { app, documentObject } = createHarness({
     navigatorOverrides: {
       onLine: false
     }
   });
-  const input = documentObject.querySelector("#clean-input");
+  const button = documentObject.querySelector("#clean-button");
+  const output = documentObject.querySelector("#clean-output");
   const stage = documentObject.querySelector(".clean-stage");
   const label = documentObject.querySelector(".clean-button-label");
 
   await app.init();
   app.pwa.bindRegistration(createWaitingRegistration());
 
-  assert.equal(input.disabled, true);
   assert.equal(stage.dataset.state, "update");
+  assert.equal(stage.dataset.mode, "retry-update");
+  assert.equal(button.classes.has("push-button"), true);
+  assert.equal(button.classes.has("paste-target"), false);
+  assert.equal(output.hidden, true);
   assert.equal(label.textContent, "Try again");
 
   app.pwa.setUpdateMode();
-  assert.equal(input.disabled, true);
   assert.equal(stage.dataset.state, "update");
+  assert.equal(stage.dataset.mode, "retry-update");
 
   app.ui.setPrimaryActionMode("paste");
-  assert.equal(input.disabled, false);
   assert.equal(stage.dataset.state, "idle");
-  assert.equal(label.textContent, "Paste");
+  assert.equal(stage.dataset.mode, "paste");
+  assert.equal(button.classes.has("paste-target"), true);
+  assert.equal(button.classes.has("push-button"), false);
+  assert.equal(label.textContent, "Paste a link here");
   assert.equal(
     documentObject.querySelector("#status-message").textContent,
-    "Remove junk parameters from any URL you paste, type or drop in."
+    "Remove junk parameters from any URL you paste or drop in."
   );
-
-  input.value = "kept while updating";
-  app.pwa.setUpdateMode();
-  app.ui.setPrimaryActionMode("paste");
-  assert.equal(app.state.buttonMode, "clean");
-  assert.equal(label.textContent, "Clean");
-  assert.equal(stage.dataset.state, "editing");
 });
 
 test("app switches PWA update actions between offline retry and online activation", async () => {

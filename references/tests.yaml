@@ -237,40 +237,28 @@ automated:
     command: npm test
     covers:
       - unchanged valid URL input still reports "All clear!"
-      - clicking the primary action starts the clipboard read before disabling the button
+      - clicking the paste target starts the clipboard read before disabling the control
       - unexpected clipboard failures report the generic failure message
       - the primary button is restored after an unexpected clipboard failure
 
-  - id: app-field-paste
+  - id: app-paste-target
     type: unit
     file: test/app.test.js
     command: npm test
     covers:
-      - a paste event on the field cleans the pasted text and prevents default insertion
-      - the field paste writes the cleaned result back to the clipboard
-      - the field paste saves URL results to history
-      - a whitespace-only paste on the field or the document is left to the browser default, with no write and no status change
+      - in idle the control reads "Paste a link here", carries the paste-target class, and the stage has data-state "idle" and data-mode "paste"
+      - clicking the target reads the clipboard and the stage moves to "cleaning" with the output shown and the mode still "paste", which the stylesheet uses to hide the target
+      - after the animation and the hold the output is hidden, the stage is "idle", the mode is "paste", and no timer is pending
+      - when navigator.clipboard.readText is unavailable, the click sets the status "Press Cmd+V or Ctrl+V to paste a link." and nothing else changes
 
   - id: app-document-paste
     type: unit
     file: test/app.test.js
     command: npm test
     covers:
-      - a paste event on the document with a non-editable target cleans the pasted text
-      - document pastes targeting another input, a contenteditable region, or the main field are ignored by the document handler
-
-  - id: app-typed-input
-    type: unit
-    file: test/app.test.js
-    command: npm test
-    covers:
-      - the button reads "Paste" when the field is empty and "Clean" once it has typed text
-      - the stage data-state is "idle" for an empty field and "editing" for typed text
-      - tapping "Clean" cleans the field content without reading the clipboard
-      - Enter cleans the typed value, Shift+Enter does not
-      - Escape empties the field and returns the button to "Paste"
-      - the form submit event cleans the typed value and never submits natively
-      - while a written result holds in the output, "Clean" and Enter do nothing, Enter stays prevented, and the hold ends on time
+      - a paste event on the document with a non-editable target cleans the pasted text, prevents the default, writes the result back, and saves URL results to history
+      - document pastes targeting another input or a contenteditable region, or already handled, are ignored by the document handler
+      - a whitespace-only paste is left to the browser default, with no write and no status change
 
   - id: app-drop-input
     type: unit
@@ -282,15 +270,6 @@ automated:
       - a drop falls back to text/plain
       - drops carrying only files are left to the browser
 
-  - id: app-field-reset
-    type: unit
-    file: test/app.test.js
-    command: npm test
-    covers:
-      - the field is focused on load
-      - after a successful clean and write-back, the animation, and the hold, the field is empty, no longer focused, and the button reads "Paste"
-      - the paste button focuses the field when navigator.clipboard.readText is unavailable
-
   - id: app-stage-animation
     type: unit
     file: test/app.test.js
@@ -298,15 +277,14 @@ automated:
     covers:
       - writeText is called before the output renders anything
       - the output shows the diff as span elements with tok-same, tok-removed, and tok-added classes filled through textContent
-      - rendering the output sets data-state "cleaning", adds has-output to the stage, starts is-animating, keeps the field focused, and keeps the newest mobile history entry in view
+      - rendering the output sets data-state "cleaning", starts is-animating, and keeps the newest mobile history entry in view
       - a font-size transitionend on the output ends the animation, and other properties do not
       - without transitionend the animation ends after 600 ms
-      - after the animation the plain clean string holds in the output with data-state "done" for 800 ms, then the field empties and blurs and the button reads "Paste"
+      - after the animation the plain clean string holds in the output with data-state "done" for 800 ms, then the output empties and the target returns
       - a second paste during the animation or the hold cancels the pending timer and shows only the new transformation
-      - Escape and a switch to update mode cancel the display and its timer
-      - typing during the display cancels it and returns to the editing state
+      - a switch to update mode cancels the display and its timer, and returning to paste mode sets the stage back to idle
       - an unchanged result skips the collapse, pulses the status, and still holds
-      - an unexpected write-back failure clears the display and keeps the field content
+      - an unexpected write-back failure clears the display and returns the stage to idle
 
   - id: app-stage-reduced-motion
     type: unit
@@ -315,45 +293,18 @@ automated:
     covers:
       - the stage finishes immediately when the injected matchMedia reports reduced motion, with no output, no hold, and no pending timer
       - an unchanged result under reduced motion does not pulse the status
-      - a refused write-back under reduced motion shows the Copy state at once
+      - a refused write-back under reduced motion shows the Copy state at once, with the clean string in the output and selected
 
   - id: app-write-back-copy-fallback
     type: unit
     file: test/app.test.js
     command: npm test
     covers:
-      - writeText rejecting with NotAllowedError switches the button to "Copy" once the animation ends and does not show the error status
-      - after a refused write-back the field still shows the clean string, selected, the output is hidden, no timer is pending, and the stage data-state is "done"
-      - tapping "Copy" writes lastResult.output, empties and blurs the field, and returns the button to "Paste" with the status still "All clear!"
-      - a refused Copy keeps the "Copy" button and reports the blocked status
-      - editing the field leaves Copy mode for "Clean", and Escape returns to "Paste"
-
-  - id: app-field-height-sync
-    type: unit
-    file: test/app.test.js
-    command: npm test
-    covers:
-      - without field-sizing support the field height follows its scrollHeight
-      - a change in field height re-applies the layout so the newest mobile history entry stays in view
-
-  - id: app-viewport-height-variable
-    type: unit
-    file: test/app.test.js
-    command: npm test
-    covers:
-      - mobile layout sets --viewport-height on the root element from visualViewport.height in pixels
-      - desktop layout removes --viewport-height
-      - missing visualViewport support leaves --viewport-height unset so the CSS dvh fallback applies
-
-  - id: app-viewport-pan-reset
-    type: unit
-    file: test/app.test.js
-    command: npm test
-    covers:
-      - mobile layout calls window.scrollTo(0, 0) when visualViewport.offsetTop is above zero at scale 1
-      - mobile layout calls window.scrollTo(0, 0) when window.scrollY is above zero with the visual viewport at the origin
-      - no scroll reset at scale 2, on desktop, or when the offset is already 0
-      - visualViewport resize and scroll are both bound to the layout pass as passive listeners, and a scroll with a pending offset resets it
+      - writeText rejecting with NotAllowedError switches the control to "Copy" once the animation ends and does not show the error status
+      - after a refused write-back the output stays visible with the plain clean string, a Range selection covers it, no timer is pending, the stage data-state is "done", the mode is "copy", and the control carries the push-button class
+      - tapping "Copy" writes lastResult.output, empties and hides the output, and returns the control to "Paste a link here" with the status still "All clear!"
+      - a refused Copy keeps the "Copy" control and reports the blocked status
+      - a new paste while Copy shows returns the mode to "paste" and starts the new transformation
 
   - id: app-history-responsive-ordering
     type: unit
@@ -383,14 +334,14 @@ automated:
       - waiting service workers switch the primary button into update mode when the device is online
       - update activation posts a SKIP_WAITING message to the waiting worker
 
-  - id: app-update-mode-field
+  - id: app-update-mode-target
     type: unit
     file: test/app.test.js
     command: npm test
     covers:
-      - update and retry-update modes disable the field and set the stage data-state to "update"
-      - returning to a clean mode re-enables the field, restores the default status, and derives "Paste" or "Clean" from the field content
-      - field pastes, document pastes, drops, and Enter are ignored in update mode
+      - update and retry-update modes hide the output, set the stage data-state to "update" and data-mode to the mode, and give the control the push-button class
+      - returning to paste mode restores the target look, the label "Paste a link here", the idle state, and the default status
+      - document pastes and drops are ignored in update mode
 
   - id: settings-controller-domain-settings
     type: unit

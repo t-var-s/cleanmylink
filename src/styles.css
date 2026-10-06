@@ -70,7 +70,7 @@ html {
 body {
   display: flex;
   flex-direction: column;
-  height: var(--viewport-height, 100dvh);
+  height: 100dvh;
   margin: 0;
   overflow: hidden;
   color: var(--text);
@@ -237,31 +237,19 @@ body {
   animation: status-pulse 520ms ease;
 }
 
-.clean-form {
+.clean-stage {
   --field-line: 1.4rem;
   --field-padding: 1.025rem;
   display: flex;
   align-items: flex-end;
   gap: 0.6rem;
   min-width: 0;
-  margin: 0;
 }
 
-.clean-stage {
-  position: relative;
-  display: flex;
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.clean-stage[data-state="update"] {
-  display: none;
-}
-
-.clean-input,
 .clean-output {
   display: block;
-  width: 100%;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: calc(var(--field-line) + 2 * var(--field-padding) + 2px);
   max-height: calc(5 * var(--field-line) + 2 * var(--field-padding) + 2px);
   margin: 0;
@@ -273,37 +261,9 @@ body {
   font-family: var(--font-copy);
   font-size: 1rem;
   line-height: var(--field-line);
-  overflow-y: auto;
-}
-
-.clean-input {
-  caret-color: var(--accent);
-  resize: none;
-  field-sizing: content;
-  transition:
-    border-color 140ms ease,
-    box-shadow 140ms ease;
-}
-
-.clean-input::placeholder {
-  color: var(--muted);
-  opacity: 1;
-}
-
-.clean-input:focus {
-  outline: none;
-  border-color: rgba(124, 199, 255, 0.78);
-  box-shadow: 0 0 0 3px var(--focus);
-}
-
-.clean-input:disabled {
-  opacity: 0.55;
-}
-
-.clean-output {
-  min-width: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  overflow-y: auto;
   pointer-events: none;
 }
 
@@ -311,18 +271,10 @@ body {
   display: none;
 }
 
-/* The field keeps focus and its value behind the output, without adding height. */
-.clean-stage.has-output .clean-input {
-  position: absolute;
-  inset: 0;
-  max-height: 100%;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.clean-stage.has-output:focus-within .clean-output {
-  border-color: rgba(124, 199, 255, 0.78);
-  box-shadow: 0 0 0 3px var(--focus);
+/* In the Copy state the clean string is selectable, for a keyboard copy. */
+.clean-stage[data-mode="copy"] .clean-output {
+  pointer-events: auto;
+  user-select: text;
 }
 
 /* Top alignment keeps a shrinking token from stretching its line box. */
@@ -356,15 +308,6 @@ body {
 .clean-output.is-animating .tok-added {
   font-size: 1em;
   opacity: 1;
-}
-
-.clean-actions {
-  flex: none;
-  min-width: 6.5rem;
-}
-
-.clean-stage[data-state="update"] + .clean-actions {
-  flex: 1 1 auto;
 }
 
 .app-panel-hero.is-dragover {
@@ -419,7 +362,7 @@ body {
   animation: button-spinner-rotate 620ms linear infinite;
 }
 
-.clean-button.is-loading {
+.push-button.is-loading {
   background: linear-gradient(180deg, #98c7e8 0%, #73add5 54%, #548db4 100%);
   border-color: rgba(255, 255, 255, 0.7);
   border-bottom-color: rgba(8, 23, 35, 0.62);
@@ -432,6 +375,77 @@ body {
 
 .clean-button.is-loading .button-loading {
   opacity: 1;
+}
+
+/* The paste target: a button that looks like the box the output replaces. */
+.paste-target {
+  flex: 1 1 0;
+  justify-items: start;
+  min-width: 0;
+  min-height: calc(var(--field-line) + 2 * var(--field-padding) + 2px);
+  padding: var(--field-padding) 0.9rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: 4px;
+  background: rgba(9, 15, 23, 0.86);
+  color: var(--muted);
+  font-family: var(--font-copy);
+  font-size: 1rem;
+  line-height: var(--field-line);
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: none;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.paste-target:active:not(:disabled) {
+  border-style: solid;
+  border-color: var(--accent);
+  background: rgba(14, 22, 33, 0.92);
+}
+
+.paste-target:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+.paste-target:disabled {
+  cursor: progress;
+}
+
+.paste-target .button-loading {
+  justify-self: center;
+}
+
+.paste-target .button-spinner {
+  border-color: rgba(124, 199, 255, 0.18);
+  border-top-color: var(--accent);
+  border-right-color: rgba(124, 199, 255, 0.72);
+}
+
+.app-panel-hero.is-dragover .paste-target {
+  border-color: var(--accent);
+}
+
+/* The output takes the target's place while a transformation shows or holds. */
+.clean-stage[data-state="cleaning"] .paste-target,
+.clean-stage[data-state="done"] .paste-target {
+  display: none;
+}
+
+/* Copy sits beside the output as a button; the update modes fill the row. */
+.clean-stage[data-mode="copy"] .clean-button {
+  flex: none;
+  width: auto;
+  min-width: 6.5rem;
+}
+
+.clean-stage[data-state="update"] .clean-button {
+  flex: 1 1 auto;
 }
 
 .hero-credit {
@@ -742,6 +756,12 @@ body {
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.34),
       0 12px 20px rgba(0, 0, 0, 0.2);
+  }
+
+  .paste-target:hover:not(:disabled) {
+    border-style: solid;
+    border-color: rgba(124, 199, 255, 0.6);
+    color: var(--text);
   }
 
   .history-link:hover {
