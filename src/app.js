@@ -28,7 +28,7 @@ export function createApp({
       resultHoldMs: 500,
       reducedMotionQuery: "(prefers-reduced-motion: reduce)",
       defaultStatus: "Remove junk parameters from any URL you paste or drop in.",
-      defaultButtonLabel: "Paste a link here",
+      defaultButtonLabel: "Click to paste a link here",
       buttonLabels: {
         copy: "Copy",
         update: "Update Now",

@@ -246,7 +246,7 @@ automated:
     file: test/app.test.js
     command: npm test
     covers:
-      - in idle the control reads "Paste a link here", carries the paste-target class, and the stage has data-state "idle" and data-mode "paste"
+      - in idle the control reads "Click to paste a link here", carries the paste-target class, and the stage has data-state "idle" and data-mode "paste"
       - clicking the target reads the clipboard and the stage moves to "cleaning" with the output shown and the mode still "paste", which the stylesheet uses to hide the target
       - after the animation and the hold the output is hidden, the stage is "idle", the mode is "paste", and no timer is pending
       - when navigator.clipboard.readText is unavailable, the click sets the status "Press Cmd+V or Ctrl+V to paste a link." and nothing else changes
@@ -304,7 +304,7 @@ automated:
     covers:
       - writeText rejecting with NotAllowedError switches the control to "Copy" once the animation ends and does not show the error status
       - after a refused write-back the output stays visible with the plain clean string, a Range selection covers it, no timer is pending, the stage data-state is "done", the mode is "copy", and the control carries the push-button class
-      - tapping "Copy" writes lastResult.output, empties and hides the output, and returns the control to "Paste a link here" with the status still "All clear!"
+      - tapping "Copy" writes lastResult.output, empties and hides the output, and returns the control to "Click to paste a link here" with the status still "All clear!"
       - a refused Copy keeps the "Copy" control and reports the blocked status
       - a new paste while Copy shows returns the mode to "paste" and starts the new transformation
 
@@ -342,7 +342,7 @@ automated:
     command: npm test
     covers:
       - update and retry-update modes hide the output, set the stage data-state to "update" and data-mode to the mode, and give the control the push-button class
-      - returning to paste mode restores the target look, the label "Paste a link here", the idle state, and the default status
+      - returning to paste mode restores the target look, the label "Click to paste a link here", the idle state, and the default status
       - document pastes and drops are ignored in update mode
 
   - id: settings-controller-domain-settings

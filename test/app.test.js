@@ -599,7 +599,7 @@ test("app shows the paste target in idle with its label and the paste mode", asy
 
   await app.init();
 
-  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Paste a link here");
+  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Click to paste a link here");
   assert.equal(app.state.buttonMode, "paste");
   assert.equal(stage.dataset.state, "idle");
   assert.equal(stage.dataset.mode, "paste");
@@ -712,7 +712,7 @@ test("app hides the target behind the output, holds the clean string, then retur
   assert.equal(output.hidden, false);
   assert.equal(output.classes.has("is-animating"), false);
   assert.deepEqual(output.children.map((token) => token.textContent), ["https://example.com/"]);
-  assert.equal(label.textContent, "Paste a link here");
+  assert.equal(label.textContent, "Click to paste a link here");
 
   await clock.advance(app.config.resultHoldMs - 1);
   assert.equal(stage.dataset.state, "done");
@@ -720,7 +720,7 @@ test("app hides the target behind the output, holds the clean string, then retur
   await clock.advance(1);
   assert.equal(output.hidden, true);
   assert.deepEqual(output.children, []);
-  assert.equal(label.textContent, "Paste a link here");
+  assert.equal(label.textContent, "Click to paste a link here");
   assert.equal(stage.dataset.state, "idle");
   assert.equal(stage.dataset.mode, "paste");
   assert.equal(button.classes.has("paste-target"), true);
@@ -841,7 +841,7 @@ test("app finishes the stage immediately when the injected matchMedia reports re
   assert.deepEqual(output.children, []);
   assert.equal(app.state.stage, "idle");
   assert.equal(app.state.buttonMode, "paste");
-  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Paste a link here");
+  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Click to paste a link here");
   assert.equal(clock.pending, 0);
 
   await pasteOnPage(documentObject, "https://example.com/path?keep=ok");
@@ -1094,7 +1094,7 @@ test("app writes the last result when Copy is tapped, then empties the output an
   assert.equal(output.hidden, true);
   assert.deepEqual(output.children, []);
   assert.equal(app.state.buttonMode, "paste");
-  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Paste a link here");
+  assert.equal(documentObject.querySelector(".clean-button-label").textContent, "Click to paste a link here");
   assert.equal(stage.dataset.state, "idle");
   assert.equal(stage.dataset.mode, "paste");
   assert.equal(button.classes.has("paste-target"), true);
@@ -1367,7 +1367,7 @@ test("app turns the target into a full-row button in update mode and restores it
   assert.equal(stage.dataset.mode, "paste");
   assert.equal(button.classes.has("paste-target"), true);
   assert.equal(button.classes.has("push-button"), false);
-  assert.equal(label.textContent, "Paste a link here");
+  assert.equal(label.textContent, "Click to paste a link here");
   assert.equal(
     documentObject.querySelector("#status-message").textContent,
     "Remove junk parameters from any URL you paste or drop in."
