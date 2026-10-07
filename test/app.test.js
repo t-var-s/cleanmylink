@@ -702,6 +702,7 @@ test("app hides the target behind the output, holds the clean string, then retur
   assert.equal(output.hidden, false);
   assert.equal(button.disabled, false);
 
+  await clock.advance(app.config.revealHoldMs);
   await output.dispatchEvent({ type: "transitionend", propertyName: "color" });
   assert.equal(stage.dataset.state, "cleaning");
 
@@ -756,7 +757,7 @@ test("app renders the transformation as text spans after the write-back has star
   assert.deepEqual(clipboardWrites, ["<b>x</b> y"]);
   assert.equal(stage.dataset.state, "cleaning");
   assert.equal(output.hidden, false);
-  assert.equal(output.classes.has("is-animating"), true);
+  assert.equal(output.classes.has("is-animating"), false);
   assert.equal(output.innerHTML, "");
   assert.deepEqual(
     output.children.map((token) => [token.tagName, token.className, token.textContent]),
@@ -768,6 +769,63 @@ test("app renders the transformation as text spans after the write-back has star
     ]
   );
   assert.equal(historySection.scrollTop, 500);
+
+  await harness.clock.advance(app.config.revealHoldMs - 1);
+  assert.equal(output.classes.has("is-animating"), false);
+  assert.equal(stage.dataset.state, "cleaning");
+  await harness.clock.advance(1);
+  assert.equal(output.classes.has("is-animating"), true);
+  assert.equal(stage.dataset.state, "cleaning");
+});
+
+test("app reveals the pasted text for a beat before the animation, and counts the timeout from there", async () => {
+  const { app, documentObject, clock } = createHarness();
+  const output = documentObject.querySelector("#clean-output");
+  const stage = documentObject.querySelector(".clean-stage");
+
+  await app.init();
+  await pasteOnPage(documentObject, "https://example.com/?utm_source=x");
+
+  assert.equal(stage.dataset.state, "cleaning");
+  assert.equal(output.classes.has("is-animating"), false);
+  assert.equal(outputText(output), "https://example.com/?utm_source=x");
+  assert.equal(clock.pending, 1);
+
+  await clock.advance(app.config.revealHoldMs);
+  assert.equal(output.classes.has("is-animating"), true);
+  assert.equal(stage.dataset.state, "cleaning");
+  assert.equal(clock.pending, 1);
+
+  await clock.advance(app.config.animationTimeoutMs - 1);
+  assert.equal(stage.dataset.state, "cleaning");
+  await clock.advance(1);
+  assert.equal(stage.dataset.state, "done");
+  assert.equal(outputText(output), "https://example.com/");
+});
+
+test("app cancels the reveal when a second paste arrives during it", async () => {
+  const { app, documentObject, clipboardWrites, clock } = createHarness();
+  const output = documentObject.querySelector("#clean-output");
+  const stage = documentObject.querySelector(".clean-stage");
+
+  await app.init();
+  await pasteOnPage(documentObject, "https://example.com/a?fbclid=1");
+  await clock.advance(app.config.revealHoldMs - 50);
+  assert.equal(output.classes.has("is-animating"), false);
+
+  await pasteOnPage(documentObject, "https://example.com/b?gclid=2");
+  assert.equal(outputText(output), "https://example.com/b?gclid=2");
+  assert.equal(output.classes.has("is-animating"), false);
+  assert.equal(clock.pending, 1);
+
+  await clock.advance(app.config.revealHoldMs);
+  assert.equal(output.classes.has("is-animating"), true);
+  assert.equal(outputText(output), "https://example.com/b?gclid=2");
+
+  await clock.advance(app.config.animationTimeoutMs + app.config.resultHoldMs);
+  assert.deepEqual(clipboardWrites, ["https://example.com/a", "https://example.com/b"]);
+  assert.equal(stage.dataset.state, "idle");
+  assert.equal(clock.pending, 0);
 });
 
 test("app finishes the stage immediately when the injected matchMedia reports reduced motion", async () => {
@@ -815,14 +873,15 @@ test("app shows Copy immediately under reduced motion when the write-back is ref
   assert.equal(clock.pending, 0);
 });
 
-test("app ends the animation after 600 ms when transitionend never fires", async () => {
+test("app ends the animation after the timeout when transitionend never fires", async () => {
   const { app, documentObject, clock } = createHarness();
   const stage = documentObject.querySelector(".clean-stage");
 
   await app.init();
   await pasteOnPage(documentObject, "https://example.com/?utm_source=x");
+  await clock.advance(app.config.revealHoldMs);
 
-  await clock.advance(599);
+  await clock.advance(app.config.animationTimeoutMs - 1);
   assert.equal(stage.dataset.state, "cleaning");
   assert.equal(clock.pending, 1);
 
@@ -842,14 +901,15 @@ test("app cancels the pending animation and hold when a second paste arrives", a
 
   await app.init();
   await pasteOnPage(documentObject, "https://example.com/a?fbclid=1");
-  await clock.advance(300);
+  await clock.advance(app.config.revealHoldMs + 100);
+  assert.equal(output.classes.has("is-animating"), true);
 
   await pasteOnPage(documentObject, "https://example.com/b?gclid=2");
   assert.equal(outputText(output), "https://example.com/b?gclid=2");
   assert.equal(stage.dataset.state, "cleaning");
   assert.equal(clock.pending, 1);
 
-  await clock.advance(599);
+  await clock.advance(app.config.revealHoldMs + app.config.animationTimeoutMs - 1);
   assert.equal(stage.dataset.state, "cleaning");
   await clock.advance(1);
   assert.equal(stage.dataset.state, "done");
@@ -859,7 +919,7 @@ test("app cancels the pending animation and hold when a second paste arrives", a
   assert.equal(stage.dataset.state, "cleaning");
   assert.equal(clock.pending, 1);
 
-  await clock.advance(app.config.animationTimeoutMs + app.config.resultHoldMs);
+  await clock.advance(app.config.revealHoldMs + app.config.animationTimeoutMs + app.config.resultHoldMs);
   assert.deepEqual(clipboardWrites, ["https://example.com/a", "https://example.com/b", "Hello world."]);
   assert.deepEqual(app.state.historyEntries.map((entry) => entry.url), ["https://example.com/b", "https://example.com/a"]);
   assert.equal(stage.dataset.state, "idle");
@@ -874,7 +934,7 @@ test("app cancels the stage on a switch to update mode and returns to idle after
 
   await app.init();
   await pasteOnPage(documentObject, "https://example.com/?utm_source=y");
-  await clock.advance(app.config.animationTimeoutMs);
+  await clock.advance(app.config.revealHoldMs + app.config.animationTimeoutMs);
   assert.equal(stage.dataset.state, "done");
 
   app.pwa.bindRegistration(createWaitingRegistration());
@@ -993,7 +1053,7 @@ test("app switches the control to Copy beside the selected output when the write
   assert.equal(app.state.stage, "cleaning");
   assert.equal(app.state.buttonMode, "paste");
 
-  await clock.advance(app.config.animationTimeoutMs);
+  await clock.advance(app.config.revealHoldMs + app.config.animationTimeoutMs);
   assert.deepEqual(clipboardWrites, []);
   assert.equal(clock.pending, 0);
   assert.equal(app.state.buttonMode, "copy");
@@ -1025,7 +1085,7 @@ test("app writes the last result when Copy is tapped, then empties the output an
 
   await app.init();
   await pasteOnPage(documentObject, "HELLO   WORLD.");
-  await clock.advance(app.config.animationTimeoutMs);
+  await clock.advance(app.config.revealHoldMs + app.config.animationTimeoutMs);
   assert.equal(outputText(output), "Hello world.");
 
   await button.dispatchEvent({ type: "click" });
@@ -1085,7 +1145,7 @@ test("app leaves Copy mode when a new paste replaces the held result", async () 
   assert.equal(stage.dataset.state, "cleaning");
   assert.deepEqual(clipboardWrites, ["https://example.com/"]);
 
-  await clock.advance(app.config.animationTimeoutMs + app.config.resultHoldMs);
+  await clock.advance(app.config.revealHoldMs + app.config.animationTimeoutMs + app.config.resultHoldMs);
   assert.equal(stage.dataset.state, "idle");
   assert.equal(output.hidden, true);
   assert.equal(clock.pending, 0);

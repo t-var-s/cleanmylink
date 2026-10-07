@@ -23,8 +23,9 @@ export function createApp({
       historyTtlMs: 72 * 60 * 60 * 1000,
       historyLimit: 100,
       desktopBreakpoint: 960,
-      animationTimeoutMs: 600,
-      resultHoldMs: 800,
+      revealHoldMs: 300,
+      animationTimeoutMs: 450,
+      resultHoldMs: 500,
       reducedMotionQuery: "(prefers-reduced-motion: reduce)",
       defaultStatus: "Remove junk parameters from any URL you paste or drop in.",
       defaultButtonLabel: "Paste a link here",
@@ -412,8 +413,12 @@ export function createApp({
           return;
         }
 
+        // The pasted text shows for a beat before the junk starts to go. The
+        // reveal counts as part of the animation, so the write-back settling
+        // during it waits for the display instead of ending it.
         app.stage.render(diffSegments(input, result.output));
-        app.stage.animate();
+        app.state.isAnimating = true;
+        app.state.animationTimer = windowObject.setTimeout(app.stage.animate, app.config.revealHoldMs);
       },
 
       render(segments) {

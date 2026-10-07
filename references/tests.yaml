@@ -277,10 +277,12 @@ automated:
     covers:
       - writeText is called before the output renders anything
       - the output shows the diff as span elements with tok-same, tok-removed, and tok-added classes filled through textContent
-      - rendering the output sets data-state "cleaning", starts is-animating, and keeps the newest mobile history entry in view
+      - rendering the output sets data-state "cleaning" without is-animating and keeps the newest mobile history entry in view
+      - is-animating is added after the 300 ms reveal, and the animation timeout counts from there
+      - a second paste during the reveal cancels it and the new text gets its own reveal
       - a font-size transitionend on the output ends the animation, and other properties do not
-      - without transitionend the animation ends after 600 ms
-      - after the animation the plain clean string holds in the output with data-state "done" for 800 ms, then the output empties and the target returns
+      - without transitionend the animation ends 450 ms after the reveal
+      - after the animation the plain clean string holds in the output with data-state "done" for 500 ms, then the output empties and the target returns
       - a second paste during the animation or the hold cancels the pending timer and shows only the new transformation
       - a switch to update mode cancels the display and its timer, and returning to paste mode sets the stage back to idle
       - an unchanged result skips the collapse, pulses the status, and still holds
@@ -291,7 +293,7 @@ automated:
     file: test/app.test.js
     command: npm test
     covers:
-      - the stage finishes immediately when the injected matchMedia reports reduced motion, with no output, no hold, and no pending timer
+      - the stage finishes immediately when the injected matchMedia reports reduced motion, with no reveal, no output, no hold, and no pending timer
       - an unchanged result under reduced motion does not pulse the status
       - a refused write-back under reduced motion shows the Copy state at once, with the clean string in the output and selected
 

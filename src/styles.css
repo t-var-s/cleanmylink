@@ -284,8 +284,8 @@ body {
   transition:
     color 160ms ease,
     text-decoration-color 160ms ease,
-    opacity 300ms ease 180ms,
-    font-size 300ms ease 180ms;
+    opacity 240ms ease 120ms,
+    font-size 240ms ease 120ms;
 }
 
 .tok-removed {
