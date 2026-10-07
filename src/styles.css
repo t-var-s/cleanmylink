@@ -383,8 +383,9 @@ body {
   justify-items: start;
   min-width: 0;
   min-height: calc(var(--field-line) + 2 * var(--field-padding) + 2px);
-  padding: var(--field-padding) 0.9rem;
-  border: 1px dashed var(--line-strong);
+  /* A 2px border with 1px less padding keeps the output's box height. */
+  padding: calc(var(--field-padding) - 1px) calc(0.9rem - 1px);
+  border: 2px dashed rgba(124, 199, 255, 0.55);
   border-radius: 4px;
   background: rgba(9, 15, 23, 0.86);
   color: var(--muted);
@@ -428,6 +429,7 @@ body {
 }
 
 .app-panel-hero.is-dragover .paste-target {
+  border-style: solid;
   border-color: var(--accent);
 }
 
@@ -760,7 +762,7 @@ body {
 
   .paste-target:hover:not(:disabled) {
     border-style: solid;
-    border-color: rgba(124, 199, 255, 0.6);
+    border-color: rgba(124, 199, 255, 0.8);
     color: var(--text);
   }
 
