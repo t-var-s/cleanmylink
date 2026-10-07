@@ -281,14 +281,14 @@ function createAppDocument() {
     "#history-empty": new FakeElement("P")
   };
   const documentObject = new FakeElement("HTML");
+  const body = { dataset: {} };
+  documentObject.activeElement = body;
   elements["#clean-output"].hidden = true;
   elements["#clean-button"].classes.add("paste-target");
   elements["#clean-button"].classes.add("clean-button");
 
   return Object.assign(documentObject, {
-    body: {
-      dataset: {}
-    },
+    body,
     documentElement: {
       style: {
         properties: new Map(),
@@ -605,6 +605,7 @@ test("app shows the paste target in idle with its label and the paste mode", asy
   assert.equal(stage.dataset.mode, "paste");
   assert.equal(button.classes.has("paste-target"), true);
   assert.equal(button.classes.has("push-button"), false);
+  assert.equal(button.focused, false);
   assert.equal(documentObject.querySelector("#clean-output").hidden, true);
 });
 
@@ -724,7 +725,22 @@ test("app hides the target behind the output, holds the clean string, then retur
   assert.equal(stage.dataset.state, "idle");
   assert.equal(stage.dataset.mode, "paste");
   assert.equal(button.classes.has("paste-target"), true);
+  assert.equal(button.focused, true);
   assert.equal(clock.pending, 0);
+});
+
+test("app leaves focus alone after a clean when another element holds it", async () => {
+  const { app, documentObject, clock } = createHarness();
+  const button = documentObject.querySelector("#clean-button");
+  const elsewhere = new FakeElement("A");
+
+  await app.init();
+  await pasteOnPage(documentObject, "https://example.com/?gclid=1");
+  documentObject.activeElement = elsewhere;
+  await clock.advance(app.config.revealHoldMs + app.config.animationTimeoutMs + app.config.resultHoldMs);
+
+  assert.equal(app.state.stage, "idle");
+  assert.equal(button.focused, false);
 });
 
 test("app renders the transformation as text spans after the write-back has started", async () => {

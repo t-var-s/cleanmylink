@@ -248,7 +248,8 @@ automated:
     covers:
       - in idle the control reads "Click to paste a link here", carries the paste-target class, and the stage has data-state "idle" and data-mode "paste"
       - clicking the target reads the clipboard and the stage moves to "cleaning" with the output shown and the mode still "paste", which the stylesheet uses to hide the target
-      - after the animation and the hold the output is hidden, the stage is "idle", the mode is "paste", and no timer is pending
+      - after the animation and the hold the output is hidden, the stage is "idle", the mode is "paste", no timer is pending, and the target has focus again when nothing else took it
+      - the target is not focused on load, and focus held by another element is left alone after a clean
       - when navigator.clipboard.readText is unavailable, the click sets the status "Press Cmd+V or Ctrl+V to paste a link." and nothing else changes
 
   - id: app-document-paste

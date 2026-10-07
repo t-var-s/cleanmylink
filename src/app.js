@@ -514,7 +514,7 @@ export function createApp({
 
         app.stage.render([{ text: result.output, kind: "same" }]);
         app.stage.setState("done");
-        app.state.animationTimer = windowObject.setTimeout(app.input.reset, app.config.resultHoldMs);
+        app.state.animationTimer = windowObject.setTimeout(() => app.input.reset(), app.config.resultHoldMs);
       },
 
       // The clean string stays in the output, selected, with Copy beside it.
@@ -714,7 +714,7 @@ export function createApp({
         return uri || dataTransfer.getData("text/plain") || "";
       },
 
-      reset() {
+      reset({ focusTarget = true } = {}) {
         app.stage.cancel();
 
         if (app.ui.isUpdateMode()) {
@@ -723,6 +723,19 @@ export function createApp({
 
         app.ui.setPrimaryActionMode("paste");
         app.stage.setState("idle");
+
+        if (focusTarget) {
+          app.input.restoreFocus();
+        }
+      },
+
+      // The target is hidden while the output shows, which drops keyboard focus
+      // to the body. Put it back on the box so Enter works again without a Tab.
+      restoreFocus() {
+        const active = documentObject.activeElement;
+        if (!active || active === documentObject.body) {
+          app.elements.button.focus({ preventScroll: true });
+        }
       }
     },
 
@@ -946,7 +959,7 @@ export function createApp({
 
       app.dev.installHelpers();
       app.events.bind();
-      app.input.reset();
+      app.input.reset({ focusTarget: false });
       await app.pwa.register();
     }
   };
