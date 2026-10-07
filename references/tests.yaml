@@ -1,5 +1,5 @@
 version: 1
-verified_on: 2026-04-15
+verified_on: 2026-10-07
 
 automated:
   - id: diff-tokenizer
@@ -413,7 +413,7 @@ manual_verified:
       - grant clipboard-read and clipboard-write permissions for that origin
     steps:
       - write "https://example.com/path?utm_source=test&keep=1" to the clipboard
-      - click "Paste"
+      - click the paste target
     expected:
       - status becomes "All clear!"
       - clipboard becomes "https://example.com/path?keep=1"
@@ -428,7 +428,7 @@ manual_verified:
       - ensure local storage is empty
       - write an empty string to the clipboard
     steps:
-      - click "Paste"
+      - click the paste target
     expected:
       - status becomes "No text was found in your clipboard."
       - no history item is created
@@ -441,7 +441,7 @@ manual_verified:
       - grant clipboard-read and clipboard-write permissions
       - write "HELLO   WORLD.\nTHIS IS FINE." to the clipboard
     steps:
-      - click "Paste"
+      - click the paste target
     expected:
       - clipboard becomes "Hello world. This is fine."
       - status becomes "All clear!"
@@ -548,7 +548,7 @@ manual_verified:
       - start the app with npm run start
       - open the page without clipboard-read permission
     steps:
-      - click "Paste"
+      - click the paste target
     expected:
       - status becomes "Clipboard access is blocked. Try allowing clipboard permissions."
 
@@ -559,15 +559,15 @@ manual_verified:
       - open the HTTPS deployment in Safari on iOS or macOS without pre-granting clipboard access
       - copy a URL from another app or origin
     steps:
-      - click "Paste"
-      - confirm Safari immediately presents its native Paste control
+      - click the paste target
+      - confirm Safari immediately presents its native Paste control over the box
       - choose Paste
     expected:
       - the clipboard read is accepted as part of the primary-action user activation
       - the URL is cleaned and written back to the clipboard
       - status becomes "All clear!"
 
-  - id: browser-field-input-sources
+  - id: browser-paste-target-input-sources
     type: browser
     tool: playwright-cli
     setup:
@@ -576,19 +576,18 @@ manual_verified:
       - grant clipboard-read and clipboard-write permissions
       - seed at least six history entries
     steps:
-      - type a URL long enough to wrap past five lines
-      - press Enter
-      - type text into the field and press Escape
+      - write a URL with tracking parameters long enough to wrap past five lines to the clipboard and click the paste target
+      - dispatch a document paste event carrying text/plain with another URL
       - dispatch dragenter and drop events carrying text/uri-list and text/plain on the hero panel
       - review the browser console
     expected:
-      - the field is focused on load and the button reads "Paste"
-      - the button reads "Clean" while the field has typed text, and the field grows to five lines, then scrolls inside
-      - the field never widens the panel or the page
-      - the newest mobile history entry stays above the panel while the field grows and after the clean
-      - Enter writes the cleaned URL to the clipboard, the status becomes "All clear!", and after the animation and hold the field is empty and blurred
-      - Escape empties the field and keeps focus
-      - the panel border highlights during the drag, and the drop cleans the text/uri-list value
+      - in idle the target is a dashed blue box reading "Click to paste a link here" with a pointer cursor and no text caret, and the stage carries data-state "idle" and data-mode "paste"
+      - clicking the target reads the clipboard, the status becomes "All clear!", the output takes the target's place without moving the panel, the clean URL holds, and the target returns empty
+      - the output grows to five lines, then scrolls inside, and never widens the panel or the page
+      - the newest mobile history entry stays above the panel while the output shows and after the clean
+      - the document paste cleans without any element focused and the clipboard holds the clean result
+      - the panel border and the target border highlight during the drag, and the drop cleans the text/uri-list value
+      - no keyboard-related element exists on the page: no textarea, no form, no label
       - the console shows no Content-Security-Policy report or other error
 
   - id: browser-write-back-copy-fallback
@@ -599,12 +598,13 @@ manual_verified:
       - grant clipboard-read and clipboard-write permissions
       - add an init script that makes the first navigator.clipboard.writeText call reject with a NotAllowedError DOMException
     steps:
-      - at 390x844 and again at 1440x900, type a URL with tracking parameters and press Enter
-      - tap "Copy"
+      - at 390x844 and again at 1440x900, dispatch a document paste with a URL that has tracking parameters
+      - press Cmd+C or Ctrl+C before tapping anything, then tap "Copy"
     expected:
-      - after Enter and the animation the button reads "Copy", the status reads "All clear!", and the field shows the clean URL fully selected
+      - after the reveal and the animation the control reads "Copy" as a push button beside the output, the status reads "All clear!", and the output shows the clean URL fully selected
+      - the keyboard copy puts the clean URL on the clipboard without tapping Copy
       - the newest mobile history entry stays above the grown panel
-      - after Copy the clipboard holds the clean URL, the field is empty and blurred, the button reads "Paste", and the status still reads "All clear!"
+      - after Copy the clipboard holds the clean URL, the output is hidden, the target reads "Click to paste a link here", and the status still reads "All clear!"
 
   - id: browser-transformation-animation
     type: browser
@@ -614,16 +614,17 @@ manual_verified:
       - grant clipboard-read and clipboard-write permissions
       - seed at least six history entries
     steps:
-      - at 390x844 and again at 1440x900, type a URL with tracking parameters long enough to grow the field to several lines
-      - stretch the 600 ms fallback, press Enter, and pause document.getAnimations() at 120 ms and 330 ms for screenshots
-      - resume the animations and capture the hold 300 ms later, then the end state
-      - repeat with https://x.com/someone/status/42?utm_source=x and capture frames at 0, 100, 260, 360, and 480 ms
+      - at 390x844 and again at 1440x900, dispatch a document paste with a URL with tracking parameters long enough to fill several lines
+      - capture the output during the 300 ms reveal, then pause document.getAnimations() at about 420 ms and 560 ms for screenshots
+      - resume the animations and capture the hold, then the end state
+      - repeat with https://x.com/someone/status/42?utm_source=x and capture frames at 0, 300, 400, 500, and 660 ms
     expected:
-      - at 120 ms the removed tokens are dimmed and struck through, at 330 ms they are collapsing
+      - during the reveal the pasted text shows as plain tokens with no strike
+      - at about 420 ms the removed tokens are dimmed and struck through, at about 560 ms they are collapsing
       - the host rewrite shows the old host shrinking while the new host grows in, and the output height does not change while tokens shrink at font-size 0
-      - the output has the same box as the field, so the swap does not move the panel, and the page never scrolls horizontally
-      - during the hold the plain clean URL shows with the field's focus ring and the button still reads "Clean"
-      - after the hold the field is empty and blurred, the button reads "Paste", and the newest mobile history entry stays above the panel in every frame
+      - the output has the same box as the target, so the swap does not move the panel, and the page never scrolls horizontally
+      - during the hold the plain clean URL shows and the target stays hidden
+      - after the hold the target is back, empty, and the newest mobile history entry stays above the panel in every frame
       - the console shows no error
 
   - id: browser-reduced-motion
@@ -635,13 +636,13 @@ manual_verified:
       - 'run playwright-cli run-code "async page => await page.emulateMedia({ reducedMotion: ''reduce'' })"'
       - seed at least six history entries
     steps:
-      - at 390x844 and again at 1440x900, type a URL with tracking parameters long enough to grow the field and press Enter
-      - capture the first frame after Enter
-      - make the first writeText call reject with a NotAllowedError DOMException, type the URL again, and press Enter
+      - at 390x844 and again at 1440x900, dispatch a document paste with a URL with tracking parameters long enough to fill several lines
+      - capture the first frame after the paste
+      - make the first writeText call reject with a NotAllowedError DOMException and paste the URL again
     expected:
-      - the first frame after Enter already shows the empty, blurred field, the "Paste" button, and "All clear!", with the output hidden and no token animation
+      - the first frame after the paste already shows the empty target, "All clear!", and the output hidden, with no reveal and no token animation
       - the end state matches the end state of the animated run
-      - the refused write-back shows "Copy" with the clean URL selected in the field within 300 ms
+      - the refused write-back shows "Copy" beside the selected clean URL in the output within 100 ms
       - the console shows no error
 
   - id: browser-update-mode-layout
@@ -653,9 +654,9 @@ manual_verified:
     steps:
       - at 390x844 and again at 1440x900, import /src/app.js in the page, create a second unbound app, and call ui.setPrimaryActionMode with "update", "retry-update", then "paste"
     expected:
-      - in both update modes the field is disabled and hidden and the button spans the full row with "Update Now" or "Try again"
+      - in both update modes the output is hidden and the control spans the full row as a push button reading "Update Now" or "Try again"
       - the newest mobile history entry stays above the panel as its height changes
-      - returning to "paste" shows the enabled field, the "Paste" button beside it, and the default status
+      - returning to "paste" shows the dashed box reading "Click to paste a link here" and the default status
 
   - id: browser-pwa-basics
     type: browser
@@ -677,23 +678,22 @@ known_failures:
     observed_on: 2026-10-05
     build: 5d63186
     device: iPhone, iOS 27, Safari, preview alias textbox--cleanmylink-viewfromtheweb.netlify.app
-    observed: tapping the field lifts the hero panel to the top of the visible area with a blank band about half the screen tall between it and the keyboard
-    cause: iOS pans the visual viewport to reveal the focused field before visualViewport.resize fires, and the body shrink did not undo the pan
-    fix: 37289d6 scrolls the window back to the origin in the layout pass and re-runs it on visualViewport.scroll; covered by app-viewport-pan-reset
-    status: fixed in Safari on the same iPhone on 2026-10-05, where the panel sits directly on the keyboard; the home-screen app, history scrolling with the keyboard open, and the layout after the keyboard closes are still to be confirmed and remain listed under gaps
+    observed: tapping the text field lifted the hero panel to the top of the visible area with a blank band about half the screen tall between it and the keyboard
+    cause: iOS panned the visual viewport to reveal the focused field before visualViewport.resize fired, and the body shrink did not undo the pan
+    fix: 37289d6 scrolled the window back to the origin in the layout pass; verified in Safari on the same iPhone on 2026-10-05
+    status: historical. a2607e4 removed the text field, the visual viewport code, and the keyboard with it, so the condition cannot occur. Kept as the record of why the app never opens the on-screen keyboard
 
 gaps:
-  - "iOS Safari and the home-screen PWA: tap the field, choose Paste from the QuickType bar, and confirm the clean, then tap Copy and confirm the clipboard holds the clean link. Verified in Safari on 2026-10-05 with build 8bb905b: the suggestion appears, the clean runs, the write-back is refused and the Copy button appears as designed. Still open: the Copy tap itself, and the same run in the home-screen app"
-  - "iOS Safari and the home-screen PWA: long-press paste into the field, same checks"
-  - "iOS Safari and the home-screen PWA: with the keyboard open, the panel stays above the keyboard and history remains scrollable, and the layout is intact after the keyboard closes. The panel position is verified in Safari on 2026-10-05 with build 37289d6; see known_failures ios-keyboard-gap for the rest"
-  - "macOS Safari: Cmd+V with nothing focused, Edit menu Paste, context-menu Paste, and the Add to Dock app; confirm write-back or the Copy fallback in each"
-  - "Firefox desktop: Cmd+V cleans without showing a Paste bubble"
-  - "Chrome desktop and installed PWA: Cmd+V and the paste button"
-  - drag a link from the address bar and from another page onto the panel with a real pointer
-  - VoiceOver announcing the status region once per clean while the heading stays "Clean My Link" needs a manual check on iOS and macOS Safari
-  - the visual-viewport-driven mobile column was verified on a real iPhone with the on-screen keyboard open in Safari on 2026-10-05 after the pan reset; the home-screen app is still to be checked
+  - "iOS home-screen app: the paste target with a junk link, an unchanged link, plain text, and an empty clipboard, after accepting Update Now. Safari on the same iPhone verified the junk-link path on 2026-10-07 with builds a2607e4 and 21c4660, with the write-back inside the tap and no Copy control"
+  - "iOS Safari: the unchanged link, plain text, and empty clipboard cases on the target"
+  - "macOS Safari: click the target; Cmd+V with nothing focused; Edit-menu paste and context-menu paste, which have no field now and are expected to do nothing; the Add to Dock app"
+  - "Chrome desktop and installed PWA: Cmd+V and the target, including the one-time permission prompt"
+  - "Firefox desktop: Cmd+V cleans without a Paste bubble, and the target shows the bubble"
+  - "Android Chrome, if a device is available: the target with the one-time prompt"
+  - drag a link from the address bar and from another page onto the panel with a real pointer, including the target border highlight
+  - "reduced motion: confirm on a real iPhone and in macOS Safari with Reduce Motion turned on that the result appears at once with no reveal and no token animation"
+  - VoiceOver on iOS and macOS announcing the target as a button with its label, the status region once per clean, and the heading staying "Clean My Link"
   - Safari's native Paste control and transient clipboard activation require manual verification because the browser-owned UI is not exposed to the current automation harness
   - clipboard permission-denied handling is still covered by manual browser verification rather than automated browser tests
   - service worker registration, update lifecycle, and offline cache reuse are still covered by manual browser verification rather than automated browser tests
-  - "reduced motion: confirm on a real iPhone and in macOS Safari with Reduce Motion turned on that no token animation plays and the result appears at once"
-  - "transformation animation: confirm on a real iPhone, in macOS Safari, and in Firefox that the tokens strike, collapse, and expand within about half a second, the clean string holds briefly, and the keyboard stays open until the field blurs"
+  - the browser-* playwright-cli entries above were rewritten for the paste target on 2026-10-07 and have not been re-run against it; the unit tests and a 390x844 and 1280x800 screenshot pass of the idle, hold, Copy, and update states are what covers them today

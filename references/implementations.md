@@ -11,6 +11,8 @@ Verified on April 15, 2026:
 - the main clipboard flow works in-browser when clipboard permissions are granted
 - the blocked-permission path, empty-clipboard path, text-cleaning path, URL-cleaning path, history rendering, startup storage loading states, service worker registration, manifest availability, IndexedDB persistence, settings persistence, and localStorage migration were all checked in a local browser session
 
+Verified on October 7, 2026, on an iPhone running iOS 27 in Safari against the `textbox` preview alias, builds `a2607e4` and `21c4660`: tapping the paste target shows Safari's Paste control over the box, the pasted link appears, the junk strikes and collapses, the clean link holds and the box empties, the clipboard holds the clean link, no keyboard opens, and the `Copy` control does not appear. The home-screen app and the desktop browsers are listed as gaps in `tests.yaml`.
+
 ## File map
 
 - [`../index.html`](../index.html): main Vite HTML entry with the shared head injection marker, hero panel with a visually hidden `h1`, a `role="status"` paragraph, and `.clean-stage` with a hidden, `aria-hidden` `output` for the transformation display and the paste target button, history section, initial saved-links loading copy, settings navigation after `main`, and module script loading
