@@ -1424,3 +1424,118 @@ test("app switches PWA update actions between offline retry and online activatio
   assert.equal(app.state.isReloadingForUpdate, true);
   assert.deepEqual(postedMessages, [{ type: "SKIP_WAITING" }]);
 });
+
+test("app eases the hero panel between heights around a status change and keeps the history bottom in view", async () => {
+  const { app, documentObject } = createHarness({
+    historyEntries: [{ url: "https://example.com/a", timestamp: Date.now() }]
+  });
+  const panel = documentObject.querySelector(".app-panel-hero");
+  const section = documentObject.querySelector(".history-section");
+  const status = documentObject.querySelector("#status-message");
+  const animations = [];
+  // The rect is the height on screen, which an easing may be moving; the
+  // natural height is what the content needs after the change.
+  let rectHeight = 300;
+  let naturalHeight = 300;
+
+  panel.getBoundingClientRect = () => ({ height: rectHeight });
+  Object.defineProperty(panel, "offsetHeight", { get: () => naturalHeight });
+  panel.animate = (keyframes, options) => {
+    const animation = {
+      keyframes,
+      options,
+      cancelled: false,
+      cancel() {
+        this.cancelled = true;
+      }
+    };
+    animations.push(animation);
+    return animation;
+  };
+  section.scrollHeight = 500;
+  section.clientHeight = 200;
+
+  await app.init();
+  assert.equal(animations.length, 0);
+
+  naturalHeight = 120;
+  app.ui.setStatus("success");
+
+  assert.equal(status.textContent, "All clear!");
+  assert.equal(status.classes.has("is-swapping"), true);
+  assert.equal(animations.length, 1);
+  assert.deepEqual(animations[0].keyframes, [{ height: "300px" }, { height: "120px" }]);
+  assert.equal(animations[0].options.duration, app.config.panelResizeMs);
+  assert.equal(panel.classes.has("is-resizing"), true);
+  assert.equal(app.state.panelAnimation, animations[0]);
+  assert.equal(section.scrollTop, 500);
+
+  animations[0].onfinish();
+  assert.equal(animations[0].cancelled, true);
+  assert.equal(panel.classes.has("is-resizing"), false);
+  assert.equal(app.state.panelAnimation, null);
+
+  rectHeight = 120;
+  app.ui.setStatus("success");
+  assert.equal(animations.length, 1);
+
+  naturalHeight = 200;
+  app.ui.setStatus("empty");
+  assert.deepEqual(animations[1].keyframes, [{ height: "120px" }, { height: "200px" }]);
+
+  rectHeight = 150;
+  naturalHeight = 260;
+  app.ui.setStatus("blocked");
+  assert.equal(animations.length, 3);
+  assert.equal(animations[1].cancelled, true);
+  assert.deepEqual(animations[2].keyframes, [{ height: "150px" }, { height: "260px" }]);
+  assert.equal(app.state.panelAnimation, animations[2]);
+});
+
+test("app changes the hero panel without easing under reduced motion", async () => {
+  const { app, documentObject } = createHarness({ reducedMotion: true });
+  const panel = documentObject.querySelector(".app-panel-hero");
+  const status = documentObject.querySelector("#status-message");
+  let calls = 0;
+
+  panel.getBoundingClientRect = () => ({ height: 300 });
+  panel.offsetHeight = 120;
+  panel.animate = () => {
+    calls += 1;
+    return {};
+  };
+
+  await app.init();
+  app.ui.setStatus("success");
+
+  assert.equal(calls, 0);
+  assert.equal(status.textContent, "All clear!");
+  assert.equal(status.classes.has("is-swapping"), false);
+  assert.equal(panel.classes.has("is-resizing"), false);
+});
+
+test("app marks the first history render as entering and only the newest entry after a clean", async () => {
+  const { app, documentObject, windowObject } = createHarness({
+    historyEntries: [{ url: "https://example.com/old", timestamp: Date.now() }]
+  });
+  const list = documentObject.querySelector("#history-list");
+
+  await app.init();
+  assert.equal(list.classes.has("is-entering"), true);
+  assert.deepEqual(list.children.map((item) => item.className), ["history-item"]);
+
+  await pasteOnPage(documentObject, "https://example.com/new?utm_source=x");
+  assert.equal(list.classes.has("is-entering"), false);
+  assert.deepEqual(
+    list.children.map((item) => item.className),
+    ["history-item", "history-item is-new"]
+  );
+
+  windowObject.innerWidth = 1280;
+  app.layout.apply();
+  assert.equal(list.classes.has("is-entering"), false);
+  assert.deepEqual(
+    list.children.map((item) => item.className),
+    ["history-item", "history-item"]
+  );
+});

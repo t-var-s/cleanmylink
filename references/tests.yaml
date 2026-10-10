@@ -271,6 +271,27 @@ automated:
       - a drop falls back to text/plain
       - drops carrying only files are left to the browser
 
+  - id: app-panel-easing
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - a status change eases the hero panel from its on-screen height to the new content height through panel.animate with config.panelResizeMs, adds is-resizing, and marks the status is-swapping
+      - the history section's scrollTop is pinned to its scrollHeight through the easing on mobile
+      - the easing's finish cancels the animation, removes is-resizing, and clears state.panelAnimation
+      - a change that leaves the height alone starts no animation
+      - a change during an easing cancels it and starts the next from the on-screen height
+      - under reduced motion the content changes with no animation, no is-resizing, and no is-swapping
+
+  - id: app-history-entrance
+    type: unit
+    file: test/app.test.js
+    command: npm test
+    covers:
+      - the first history render marks the list is-entering and no item is-new
+      - after a clean the list is no longer is-entering and only the entry for the cleaned URL carries is-new
+      - a re-render for a layout change carries neither class
+
   - id: app-stage-animation
     type: unit
     file: test/app.test.js
@@ -357,6 +378,7 @@ automated:
       - settings app writes domain-transform settings only on submit
       - settings app returns to the main cleaning page after a successful save
       - settings app reports storage write failures without navigating
+      - settings app renders the toggles before the saved settings arrive, disabled and in the default states with the form aria-busy, then applies the saved states in place without a second render
 
   - id: build-output-excludes-source-only-directories
     type: build
@@ -628,6 +650,38 @@ manual_verified:
       - after the hold the target is back, empty, and the newest mobile history entry stays above the panel in every frame
       - the console shows no error
 
+  - id: browser-panel-easing
+    type: browser
+    tool: playwright-cli
+    setup:
+      - start the app with npm run dev
+      - grant clipboard-read and clipboard-write permissions
+      - seed at least six history entries by cleaning links
+    steps:
+      - at 390x844, log per animation frame the history section's scrollHeight minus clientHeight minus scrollTop, and the hero panel's height, from the click on the target until the target is back
+      - capture frames at 0, 60, 130, 220, 1250, 1350, and 1450 ms after the click
+      - repeat at 1280x800 with a youtube.com link and capture frames at 0, 90, 450, and 1350 ms
+    expected:
+      - the panel height moves through intermediate values on the way to "All clear!" with the output shown, and again on the way back to the target, never snapping between two frames except for the first frame after the click
+      - on mobile the gap under the newest history entry is 0 in every frame after the first, so it never slides under the panel
+      - the status text fades in rather than cutting, and the newest history entry fades in from below on mobile and from the right on desktop while the older entries stay still
+      - the console shows no error
+
+  - id: browser-settings-transition
+    type: browser
+    tool: playwright-cli
+    setup:
+      - build the app with npm run build and start the production preview with npm run preview
+      - open http://127.0.0.1:4173 in a headed Chrome
+      - add an init script that records whether the pagereveal event carries a viewTransition
+    steps:
+      - at 390x844 and again at 1280x800, click the settings icon, wait, then click the save button
+      - in a second run, swap the main page body for the settings body inside document.startViewTransition, slow the animations with playbackRate, and capture frames
+    expected:
+      - both pagereveal events carry a view transition when the navigation is not interrupted
+      - the simulated frames show one card travelling from the hero position to the settings position with its content cross-fading, the background around it fading, and the card never disappearing mid-way
+      - the settings page shows its three toggles from the first frame, with no loading row and no height change once the saved states arrive
+
   - id: browser-reduced-motion
     type: browser
     tool: playwright-cli
@@ -642,6 +696,7 @@ manual_verified:
       - make the first writeText call reject with a NotAllowedError DOMException and paste the URL again
     expected:
       - the first frame after the paste already shows the empty target, "All clear!", and the output hidden, with no reveal and no token animation
+      - the panel changes height at once, with no is-resizing class and no status fade
       - the end state matches the end state of the animated run
       - the refused write-back shows "Copy" beside the selected clean URL in the output within 100 ms
       - the console shows no error
@@ -693,6 +748,7 @@ gaps:
   - "Android Chrome, if a device is available: the target with the one-time prompt"
   - drag a link from the address bar and from another page onto the panel with a real pointer, including the target border highlight
   - "reduced motion: confirm on a real iPhone and in macOS Safari with Reduce Motion turned on that the result appears at once with no reveal and no token animation"
+  - "page transition: the cross-document view transition between the main page and settings has only been confirmed through pagereveal in headed Chrome, where it is timing-dependent under Playwright, and through a same-document simulation of the frames. Watch it in Chrome and Safari 18.2 or later by hand, including the return from save on a phone"
   - VoiceOver on iOS and macOS announcing the target as a button with its label, the status region once per clean, and the heading staying "Clean My Link"
   - Safari's native Paste control and transient clipboard activation require manual verification because the browser-owned UI is not exposed to the current automation harness
   - clipboard permission-denied handling is still covered by manual browser verification rather than automated browser tests

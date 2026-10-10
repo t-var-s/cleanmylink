@@ -34,8 +34,32 @@ function appHeadPlugin() {
   };
 }
 
+// Marks the page's module script as render-blocking where the page asks for
+// it. Vite rewrites the script tag during the build, so the attribute is
+// added after that instead of in the source HTML.
+function renderBlockingScriptPlugin() {
+  return {
+    name: "cleanmylink-render-blocking-script",
+    transformIndexHtml: {
+      order: "post",
+      handler(html, context) {
+        const page = getPageConfig(context.path);
+
+        if (!page?.renderBlockingScript) {
+          return html;
+        }
+
+        return html.replace(
+          /<script type="module"( crossorigin)? src=/g,
+          '<script type="module" blocking="render"$1 src='
+        );
+      }
+    }
+  };
+}
+
 export default defineConfig({
-  plugins: [appHeadPlugin()],
+  plugins: [appHeadPlugin(), renderBlockingScriptPlugin()],
   build: {
     outDir: "dist",
     emptyOutDir: true,

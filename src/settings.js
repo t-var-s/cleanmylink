@@ -24,7 +24,8 @@ export function createSettingsApp({
       list: documentObject.querySelector("#settings-list"),
       saveButton: documentObject.querySelector(".settings-save-button"),
       saveLabel: documentObject.querySelector("#settings-save-label"),
-      status: documentObject.querySelector("#settings-status")
+      status: documentObject.querySelector("#settings-status"),
+      inputs: new Map()
     },
 
     state: {
@@ -37,6 +38,7 @@ export function createSettingsApp({
     ui: {
       renderRules() {
         app.elements.list.innerHTML = "";
+        app.elements.inputs.clear();
 
         for (const rule of siteRules) {
           const item = documentObject.createElement("li");
@@ -59,7 +61,8 @@ export function createSettingsApp({
           const input = documentObject.createElement("input");
           input.type = "checkbox";
           input.name = rule.id;
-          input.checked = app.state.draftSettings[rule.id];
+          input.checked = app.state.draftSettings[rule.id] === true;
+          app.elements.inputs.set(rule.id, input);
 
           const control = documentObject.createElement("span");
           control.className = "settings-switch";
@@ -70,6 +73,18 @@ export function createSettingsApp({
           item.append(label);
           app.elements.list.append(item);
         }
+      },
+
+      // The toggles render before the saved settings arrive, so the page has
+      // its final size from the first frame. This moves them to the saved
+      // states and commits the styles while the form is still busy, so the
+      // switch transition does not play on load.
+      applyDraft() {
+        for (const [id, input] of app.elements.inputs) {
+          input.checked = app.state.draftSettings[id] === true;
+        }
+
+        void app.elements.list.offsetWidth;
       },
 
       syncSaveLabel() {
@@ -96,6 +111,10 @@ export function createSettingsApp({
 
         if (app.elements.saveButton) {
           app.elements.saveButton.disabled = isLoading;
+        }
+
+        for (const input of app.elements.inputs.values()) {
+          input.disabled = isLoading;
         }
       }
     },
@@ -127,6 +146,9 @@ export function createSettingsApp({
     },
 
     async init() {
+      app.state.draftSettings = { ...app.state.savedSettings };
+      app.ui.renderRules();
+      app.ui.syncSaveLabel();
       app.ui.setLoading(true);
 
       try {
@@ -138,7 +160,7 @@ export function createSettingsApp({
       }
 
       app.state.draftSettings = { ...app.state.savedSettings };
-      app.ui.renderRules();
+      app.ui.applyDraft();
       app.ui.syncSaveLabel();
       app.ui.setLoading(false);
       app.events.bind();

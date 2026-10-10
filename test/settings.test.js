@@ -245,3 +245,34 @@ test("settings app falls back to defaults when storage cannot be read", async ()
   assert.equal(documentObject.elements[".settings-save-button"].disabled, false);
   assert.equal(errors.length, 1);
 });
+
+test("settings app renders the toggles before the saved settings arrive and applies them in place", async () => {
+  const savedSettings = {
+    ...getDefaultDomainTransformSettings(),
+    "rewrite-reddit-to-redlib": false
+  };
+  const { app, documentObject } = createHarness({ savedSettings });
+  const list = documentObject.elements["#settings-list"];
+
+  const initialising = app.init();
+
+  assert.equal(list.children.length, siteRules.length);
+  assert.equal(documentObject.elements["#settings-form"].attributes.get("aria-busy"), "true");
+  assert.equal(documentObject.inputs.every((input) => input.disabled), true);
+  assert.equal(documentObject.inputs.every((input) => input.checked), true);
+
+  await initialising;
+
+  assert.equal(list.children.length, siteRules.length);
+  assert.equal(documentObject.inputs.length, siteRules.length);
+  assert.equal(documentObject.inputs.every((input) => input.disabled), false);
+  assert.equal(
+    documentObject.inputs.find((input) => input.name === "rewrite-reddit-to-redlib").checked,
+    false
+  );
+  assert.equal(documentObject.elements["#settings-form"].attributes.get("aria-busy"), "false");
+  assert.equal(
+    documentObject.elements["#settings-save-label"].textContent,
+    "Confirm and go back to cleaning"
+  );
+});

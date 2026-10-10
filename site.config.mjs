@@ -11,7 +11,9 @@ export const pages = {
     input: "./settings.html",
     inputName: "settings",
     title: "Clean My Link Settings",
-    description: "Choose Clean My Link domain transformations"
+    description: "Choose Clean My Link domain transformations",
+    // The toggles render from the script, so the first frame waits for it.
+    renderBlockingScript: true
   }
 };
 
@@ -33,7 +35,7 @@ const documentHeadTags = [
     tag: "meta",
     attrs: {
       name: "theme-color",
-      content: "#0f0f0f"
+      content: "#091018"
     }
   }
 ];

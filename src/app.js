@@ -26,6 +26,7 @@ export function createApp({
       revealHoldMs: 300,
       animationTimeoutMs: 450,
       resultHoldMs: 500,
+      panelResizeMs: 240,
       reducedMotionQuery: "(prefers-reduced-motion: reduce)",
       defaultStatus: "Remove junk parameters from any URL you paste or drop in.",
       defaultButtonLabel: "Click to paste a link here",
@@ -73,6 +74,8 @@ export function createApp({
       pwaRegistration: null,
       isReloadingForUpdate: false,
       historyEntries: [],
+      historyRendered: false,
+      panelAnimation: null,
       enabledTransforms: sharedTransforms.defaultEnabledTransforms
     },
 
@@ -212,16 +215,108 @@ export function createApp({
 
     ui: {
       setStatus(key) {
-        app.elements.status.textContent = app.messages[key] || app.config.defaultStatus;
+        app.ui.setStatusText(app.messages[key] || app.config.defaultStatus);
+      },
+
+      setStatusText(text) {
+        const { status } = app.elements;
+        const changed = status.textContent !== text;
+
+        app.ui.resizePanel(() => {
+          status.textContent = text;
+        });
+
+        if (changed && !app.stage.prefersReducedMotion()) {
+          app.ui.restartAnimation(status, "is-swapping");
+        }
+
         app.layout.scheduleApply();
       },
 
       pulseStatus() {
-        const { status } = app.elements;
-        status.classList.toggle("is-pulsing", false);
+        app.ui.restartAnimation(app.elements.status, "is-pulsing");
+      },
+
+      restartAnimation(element, className) {
+        element.classList.toggle(className, false);
         // Reading layout restarts the animation when the class comes back.
-        void status.offsetWidth;
-        status.classList.toggle("is-pulsing", true);
+        void element.offsetWidth;
+        element.classList.toggle(className, true);
+      },
+
+      // Runs a change that moves the hero panel's edge, such as a new status
+      // or the output appearing, and eases the panel between the two heights
+      // instead of letting it snap. The change itself always happens; the
+      // easing is skipped without the Web Animations API or under reduced
+      // motion, and a change during an easing continues from its current
+      // height.
+      resizePanel(mutate) {
+        const panel = app.elements.heroPanel;
+        const canAnimate =
+          typeof panel?.animate === "function" &&
+          !app.stage.prefersReducedMotion();
+
+        if (!canAnimate) {
+          mutate();
+          return;
+        }
+
+        const before = panel.getBoundingClientRect().height;
+        app.ui.endPanelResize();
+        mutate();
+        const after = panel.offsetHeight;
+
+        if (!before || !after || Math.abs(after - before) < 1) {
+          return;
+        }
+
+        panel.classList.toggle("is-resizing", true);
+        const animation = panel.animate(
+          [{ height: `${before}px` }, { height: `${after}px` }],
+          { duration: app.config.panelResizeMs, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" }
+        );
+        app.state.panelAnimation = animation;
+        animation.onfinish = () => {
+          if (app.state.panelAnimation === animation) {
+            app.ui.endPanelResize();
+          }
+        };
+        app.ui.pinHistoryScroll(animation);
+      },
+
+      // The history section changes height on every frame of a panel easing.
+      // On mobile its bottom edge stays against the panel for as long as the
+      // easing runs; the frame budget bounds the loop whatever the clock does.
+      pinHistoryScroll(animation) {
+        let frames = Math.ceil(app.config.panelResizeMs / 16) + 2;
+        const step = () => {
+          frames -= 1;
+          if (app.state.panelAnimation !== animation || frames < 0) {
+            return;
+          }
+
+          if (app.layout.isMobile()) {
+            const section = app.elements.historySection;
+            section.scrollTop = section.scrollHeight;
+          }
+
+          windowObject.requestAnimationFrame(step);
+        };
+
+        windowObject.requestAnimationFrame(step);
+      },
+
+      endPanelResize() {
+        const animation = app.state.panelAnimation;
+        app.state.panelAnimation = null;
+
+        if (!animation) {
+          return;
+        }
+
+        animation.cancel();
+        app.elements.heroPanel.classList.toggle("is-resizing", false);
+        app.ui.syncHistoryScroll();
       },
 
       setButtonLabel(label) {
@@ -256,9 +351,8 @@ export function createApp({
         }
 
         if (wasUpdateMode) {
-          app.elements.status.textContent = app.config.defaultStatus;
+          app.ui.setStatusText(app.config.defaultStatus);
           app.stage.setState("idle");
-          app.layout.scheduleApply();
         }
       },
 
@@ -266,10 +360,15 @@ export function createApp({
         return app.layout.isMobile() ? entries.slice().reverse() : entries;
       },
 
-      renderHistory() {
+      // The first render fades the whole list in. After a clean only the new
+      // entry animates, and a re-render for a layout change animates nothing.
+      renderHistory({ newUrl = null } = {}) {
         const entries = app.state.historyEntries;
         const orderedEntries = app.ui.getOrderedEntries(entries);
+        const isFirstRender = !app.state.historyRendered;
 
+        app.state.historyRendered = true;
+        app.elements.historyList.classList.toggle("is-entering", isFirstRender);
         app.elements.historyList.innerHTML = "";
         app.elements.historyEmpty.textContent = entries.length > 0
           ? ""
@@ -279,7 +378,7 @@ export function createApp({
 
         for (const entry of orderedEntries) {
           const item = documentObject.createElement("li");
-          item.className = "history-item";
+          item.className = entry.url === newUrl ? "history-item is-new" : "history-item";
 
           const link = documentObject.createElement("a");
           link.className = "history-link";
@@ -438,7 +537,9 @@ export function createApp({
       },
 
       showOutput(isVisible) {
-        app.elements.output.hidden = !isVisible;
+        app.ui.resizePanel(() => {
+          app.elements.output.hidden = !isVisible;
+        });
         app.layout.scheduleApply();
       },
 
@@ -543,10 +644,11 @@ export function createApp({
         app.state.isAnimating = false;
         app.state.stageResult = null;
 
+        // Hiding first lets the panel ease from the output's full height.
         if (!app.elements.output.hidden) {
+          app.stage.showOutput(false);
           app.elements.output.innerHTML = "";
           app.elements.output.classList.toggle("is-animating", false);
-          app.stage.showOutput(false);
         }
       }
     },
@@ -587,7 +689,7 @@ export function createApp({
 
         if (result.isUrl) {
           await app.history.save(result.output);
-          app.ui.renderHistory();
+          app.ui.renderHistory({ newUrl: result.output });
         }
 
         return {
