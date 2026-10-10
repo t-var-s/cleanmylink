@@ -133,12 +133,77 @@ automated:
     covers:
       - cleanUrl rewrites reddit.com URLs to redlib.freedit.eu
 
-  - id: transforms-youtube-v-only
+  - id: transforms-youtube-v-and-t
     type: unit
     file: test/transforms.test.js
     command: npm test
     covers:
-      - cleanUrl keeps only the v parameter on YouTube watch URLs
+      - cleanUrl keeps only the v and t parameters on youtube.com watch URLs
+      - cleanUrl keeps only t on youtu.be URLs and drops si
+      - cleanUrl drops list and si on youtube.com
+
+  - id: transforms-tracking-prefixes-and-known-list
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - cleanUrl removes parameters with the mtm_, pk_, hsa_, and _bta_ prefixes
+      - cleanUrl removes known parameters from every group of the specification list
+      - matching is case-insensitive for prefixes and names
+
+  - id: transforms-unwrap-redirects
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - cleanUrl replaces a google.com/url wrapper with its q destination
+      - cleanUrl replaces a duckduckgo.com/l/ wrapper with its uddg destination
+      - the unwrapped destination goes through tracking cleanup and site rules
+
+  - id: transforms-unwrap-google-country-domains
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - google.co.uk, www.google.com.au, and google.de /url wrappers unwrap like google.com
+      - a host that merely starts with google. on another domain is not a wrapper
+
+  - id: transforms-unwrap-nested
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - a safelinks wrapper around a google.com/url wrapper resolves to the final destination in one clean
+      - unwrapping stops after four passes and leaves a deeper wrapper at that level
+
+  - id: transforms-unwrap-guards
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - a javascript: or relative destination leaves the wrapper unchanged
+      - a matching host with a different path is not a wrapper
+      - a host that only contains the safelinks suffix in the middle is not a wrapper
+      - opaque short links such as t.co are left unchanged
+
+  - id: transforms-disabled-unwrap
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - cleanUrl can leave a wrapper in place when the unwrap transform is disabled
+
+  - id: transforms-fragments
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - a text fragment directive is removed
+      - a text fragment directive after an anchor is removed and the anchor kept
+      - a plain anchor is kept
+      - xtor and known tracking-parameter fragments are removed
+      - a bare trailing hash is removed
+      - an in-page route fragment is kept
 
   - id: transforms-whitespace-split-url
     type: unit
@@ -147,6 +212,42 @@ automated:
     covers:
       - cleanInput treats whitespace-split URLs as URLs
       - cleanInput removes whitespace from URL candidates before parsing
+
+  - id: transforms-url-then-words
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - a URL followed by words is extracted rather than joined into one URL
+      - a link split across lines at URL characters is still joined
+      - joinSplitUrl returns null when a later piece starts with a letter
+
+  - id: transforms-extract-single-url
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - cleanInput treats share text with exactly one distinct URL as that URL
+      - the same URL repeated counts as one distinct URL
+      - extraction runs before sentence-casing so the URL keeps its case
+      - the result is a URL result with changed set
+
+  - id: transforms-extract-punctuation
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - trailing sentence punctuation is trimmed from an extracted URL
+      - angle brackets, Markdown link syntax, and full-width quotes are trimmed
+      - a balanced closing parenthesis inside the URL is kept
+      - extractSingleUrl returns null when there is no URL
+
+  - id: transforms-extract-two-urls
+    type: unit
+    file: test/transforms.test.js
+    command: npm test
+    covers:
+      - text with two distinct URLs stays plain text and is not cleaned as a URL
 
   - id: transforms-text-normalization
     type: unit
@@ -228,6 +329,7 @@ automated:
       - app cleans clipboard URLs with saved domain-transform settings
       - app writes cleaned URL output back to the clipboard
       - app saves cleaned URL results to history
+      - app extracts the single URL from share text, writes the clean link back, and saves it to history
       - app writes cleaned plain-text output back to the clipboard
       - app does not save plain-text results to history
 
@@ -481,7 +583,7 @@ manual_verified:
       - clean "https://www.youtube.com/watch?v=abc123&utm_source=newsletter&t=90"
     expected:
       - x.com result becomes "https://fxtwitter.com/someuser/status/42"
-      - YouTube result becomes "https://www.youtube.com/watch?v=abc123"
+      - YouTube result becomes "https://www.youtube.com/watch?v=abc123&t=90"
       - both cleaned URLs appear in recent links
 
   - id: browser-settings-domain-rules

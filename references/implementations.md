@@ -62,7 +62,13 @@ The transform layer is an ESM module. It exports:
 
 - `parseUrl`
 - `isSafeHttpUrl`
+- `isTrackingParam`
 - `stripTrackingParams`
+- `findWrappedUrl`
+- `unwrapRedirects`
+- `joinSplitUrl`
+- `stripTrackingFragment`
+- `extractSingleUrl`
 - `cleanUrl`
 - `cleanText`
 - `cleanInput`
@@ -74,24 +80,32 @@ The transform layer is an ESM module. It exports:
 - `siteRules`
 - `defaultEnabledTransforms`
 - `isTransformEnabled`
+- `trackingParamPrefixes`, `knownTrackingParams`, `trackingFragmentNames`, `redirectWrappers`, `maxUnwrapPasses`: the data behind the generic rules, exported so tests and future tooling can read them
 
 Implementation choices:
 
 - URL validation is based on `new URL(...)` plus an explicit `http:` or `https:` allowlist.
 - URL cleaning always clones the input URL before mutation.
-- Tracking-parameter stripping is case-insensitive.
+- The URL registry runs in array order, which is the order the specification fixes for generic rules: unwrap, strip parameters, strip fragments, then the site rules. Each `apply` mutates the same `URL` object, so a later rule sees the earlier rule's result. The unwrap rule replaces the whole URL through the `href` setter, which is how a site rule such as the `x.com` rewrite ends up running on a destination that was wrapped
+- Tracking-parameter stripping is case-insensitive: `isTrackingParam(name)` lowercases the name, then checks the prefix list (`utm_`, `ref_`, `mtm_`, `pk_`, `hsa_`, `_bta_`) and the known-name set, which is stored lowercased
+- Redirect unwrapping is offline. `redirectWrappers` lists each wrapper as an exact `host`, a `hostSuffix` for any subdomain, or a `hostPattern` regular expression, plus a `path` and the parameters to try in order. The Google search redirect uses a pattern so `google.co.uk/url`, `google.com.au/url`, and the other country domains unwrap like `google.com/url`. The path comparison drops trailing slashes, so `/l/` and `/l` are the same entry, and a bare `/` only matches a root path. The suffix form requires at least one label before the suffix, so `safelinks.protection.outlook.com` itself is not a wrapper and a host that merely contains the suffix in the middle is not either. `findWrappedUrl(url)` returns the first parameter value that parses as an `http:` or `https:` URL, or `null`; a `javascript:` or relative value leaves the wrapper untouched. `unwrapRedirects(url)` repeats this up to `maxUnwrapPasses` (4) times, so a mail safe link around a search redirect resolves in one clean, and a wrapper nested deeper than that is left at whatever level the fourth pass reached
+- Fragment cleanup in `stripTrackingFragment(url)`: a text fragment directive (`:~:` and everything after it) is cut off, keeping any anchor before it, so `#install:~:text=foo` becomes `#install`. A fragment of the form `name=value` whose name is `xtor` or any tracking parameter is removed. The hash is then written back through the `hash` setter, which also drops a bare trailing `#`, the same reason `cleanUrl` re-assigns an empty `search`. Any other fragment, including SPA routes such as `#/route?x=1`, is kept
+- `cleanInput` has three paths. First, `joinSplitUrl(text)` removes the whitespace from the trimmed text so a line-wrapped link still counts as one URL, but only when every whitespace-separated piece after the first begins with a URL character (`/ ? & # = % . - _ : ; , + @ ~`); a piece that starts with a letter, as in `https://a.com/x see this`, means the text is not a split link and the join is skipped, so the URL is extracted instead. A link wrapped in the middle of a plain word is the accepted loss. Second, `extractSingleUrl(text)` scans for runs of non-whitespace characters starting with `http://` or `https://`, trims trailing sentence and markup punctuation one character at a time (ASCII `.,;:!?'"»›)]}>…` and the full-width `。，、；：！？）】》」』`), keeps a closing parenthesis that balances one inside the URL as in Wikipedia titles, keeps only tokens that parse as HTTP(S), and returns the token when exactly one distinct one remains. The whole text is the comparison base for `changed`, so an extracted link always counts as changed. Third, plain-text cleanup. Extraction runs before sentence-casing on purpose: paths and IDs are case-sensitive, and an all-caps share text must not lowercase its link
+- The YouTube site rule clears the search and then re-sets `v` and `t` in that order when present, so `si`, `list`, `feature`, and the rest are dropped
 - Transforms are defined with stable `id`, `label`, `type`, `category`, `defaultEnabled`, and `apply` metadata so a settings UI can persist user choices without depending on array order.
 - Site-rule transforms also expose `domainLabel` metadata for the settings UI.
 - `apply(...)` receives a context object with the active `enabledTransforms` map, so later transforms can inspect settings without changing the registry contract.
 - `cleanUrl`, `cleanText`, and `cleanInput` accept an optional `enabledTransforms` map. Missing keys fall back to each transform's `defaultEnabled` value.
 - Plain-text cleaning converts all-caps text to sentence case only when there are at least two letters.
 
-Current default-enabled transforms:
+Current default-enabled transforms, in registry order:
 
-- tracking-parameter cleanup
+- `unwrap-redirects`: redirect unwrapping
+- `strip-tracking-params`: tracking-parameter cleanup
+- `strip-tracking-fragments`: text and tracking fragment cleanup
 - `x.com` -> `fxtwitter.com` except article paths
 - `reddit.com` -> `redlib.freedit.eu`
-- `youtube.com` / `youtu.be` -> clear search params, then keep only `v` if present
+- `youtube.com` / `youtu.be` -> clear search params, then keep only `v` and `t` if present
 - whitespace cleanup for plain text
 - sentence-case conversion for all-caps plain text
 
@@ -211,7 +225,7 @@ Clipboard flow:
 - Reads domain-transform settings during app startup through `storage.readDomainTransformSettings()`, composes them with default transforms, and keeps the resulting enabled-transform map in memory for clipboard cleaning.
 - If domain-transform settings cannot be read during main-page startup, the app falls back to default transform settings and logs the storage error.
 - Shows blocked/error/empty/success status messages based on the outcome
-- Stores only URL results in history
+- Stores only URL results in history. A share text whose single URL was extracted counts as a URL result: the extracted clean link goes to the clipboard and to history, and the transformation display diffs the whole pasted text against it, so the title and the prompt around the link appear as removed tokens
 
 ### Settings
 
@@ -223,7 +237,7 @@ The settings page only exposes site-specific URL transforms:
 
 Settings behavior:
 
-- Global tracking-parameter cleanup and plain-text cleanup are not exposed in settings and continue to apply by default.
+- Global cleanup, meaning redirect unwrapping, tracking-parameter cleanup, fragment cleanup, URL extraction from share text, and plain-text cleanup, is not exposed in settings and continues to apply by default. The three generic URL rules are `cleanup` entries in the registry with an `enabledTransforms` key each, so a test can switch one off, but `settings-storage.js` only persists `siteRules` and the settings page only renders those.
 - The initial HTML includes a settings loading row for the case where the script has not run, but `init()` replaces it at once: it renders the toggles from `siteRules` with the default states and the inputs disabled, sets the form `aria-busy`, and only then awaits `readDomainTransformSettings()`. When the read settles, `ui.applyDraft()` moves the inputs to the saved states and reads `offsetWidth` to commit them while the form is still busy, so the switch transition does not play on load, then `setLoading(false)` enables the inputs and the save button. The page therefore has its final height from its first frame, which matters for the arriving view transition
 - `settings.html`'s module script is marked `blocking="render"` by the `renderBlockingScriptPlugin` in [`../vite.config.mjs`](../vite.config.mjs), driven by `renderBlockingScript: true` on the page in [`../site.config.mjs`](../site.config.mjs). The source HTML has no such attribute because Vite rewrites the tag during the build; the plugin adds it in the dev server and in `dist/`. Browsers without the attribute ignore it and paint the toggles a frame later at most
 - The settings form starts with `aria-busy="true"` and the save button disabled; `settings.js` clears both once saved settings are loaded or defaulted.

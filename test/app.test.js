@@ -530,6 +530,23 @@ test("app reports unchanged valid URLs as successful clipboard cleans", async ()
   assert.equal(historyWrites.length, 1);
 });
 
+test("app extracts the single URL from share text and saves it to history", async () => {
+  const { app, clipboardWrites, historyWrites } = createHarness({
+    clipboardText: "Look at this https://example.com/share?utm_source=app&keep=1 via the app"
+  });
+
+  await app.init();
+  const result = await app.clipboard.cleanLatest();
+
+  assert.equal(result.output, "https://example.com/share?keep=1");
+  assert.equal(result.isUrl, true);
+  assert.equal(result.changed, true);
+  assert.deepEqual(clipboardWrites, ["https://example.com/share?keep=1"]);
+  assert.equal(app.state.historyEntries.length, 1);
+  assert.equal(app.state.historyEntries[0].url, "https://example.com/share?keep=1");
+  assert.equal(historyWrites.length, 1);
+});
+
 test("app cleans clipboard text without saving it to URL history", async () => {
   const { app, clipboardWrites, historyWrites } = createHarness({
     clipboardText: "HELLO   WORLD.\nTHIS IS FINE."
