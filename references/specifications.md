@@ -13,7 +13,7 @@ The app is intentionally single-purpose:
 
 Default UI copy:
 
-- Status: `Remove junk parameters from any URL you page or drop in.`
+- Status: `Remove junk parameters from any URL you paste or drop in.`
 - Button: `Click to paste a link here`
 
 When the user taps the button:
@@ -43,27 +43,74 @@ Status outcomes:
 
 ### Generic URL cleanup
 
-- Remove query parameters whose names start with `utm_`.
-- Remove `ref` and parameters whose names start with `ref_`.
-- Remove these known tracking parameters when present:
-  - `fbclid`
-  - `gclid`
-  - `dclid`
-  - `msclkid`
-  - `ttclid`
-  - `twclid`
-  - `igshid`
-  - `mc_cid`
-  - `mc_eid`
-  - `_hsenc`
-  - `_hsmi`
-  - `mkt_tok`
-  - `oly_anon_id`
-  - `oly_enc_id`
-  - `smid`
-  - `vero_id`
-  - `wickedid`
-  - `yclid`
+Generic rules run on every HTTP(S) link, before any site-specific rule, in this order: unwrap, strip parameters, strip fragments.
+
+#### Redirect unwrapping
+
+Many copied links are wrappers whose real destination sits inside a query parameter. The app replaces the wrapper with that destination without any network request.
+
+- A wrapper is recognised by host and path, not by host alone. `google.com/url` is a wrapper, `google.com/search` is not.
+- The destination is read from the wrapper's known parameter. The app accepts it only when it parses as an `http:` or `https:` URL; otherwise the link is left as it was.
+- Unwrapping repeats on the result until no wrapper matches, up to four times, so nested wrappers such as a mail safe link around a search redirect are fully resolved.
+- The unwrapped destination then goes through every other rule as if it had been pasted directly.
+- Short links with an opaque ID, such as `t.co`, `bit.ly`, `lnkd.in`, and `amzn.to`, cannot be unwrapped offline. The app leaves them unchanged.
+
+Known wrappers:
+
+| Host and path | Parameter |
+| --- | --- |
+| `google.com/url`, `www.google.com/url` | `q`, then `url` |
+| `googleadservices.com/pagead/aclk` | `adurl` |
+| `l.facebook.com/l.php`, `lm.facebook.com/l.php` | `u` |
+| `l.instagram.com/` | `u` |
+| `youtube.com/redirect`, `www.youtube.com/redirect` | `q` |
+| `out.reddit.com/` | `url` |
+| `duckduckgo.com/l/` | `uddg` |
+| `linkedin.com/safety/go`, `www.linkedin.com/safety/go` | `url` |
+| `slack-redir.net/link` | `url` |
+| `steamcommunity.com/linkfilter/` | `url` |
+| `*.safelinks.protection.outlook.com/` | `url` |
+| `linkprotect.cudasvc.com/url` | `a` |
+| `medium.com/r/` | `url` |
+| `getpocket.com/redirect` | `url` |
+
+#### Tracking parameters
+
+Parameter names are matched case-insensitively.
+
+Remove parameters whose names start with any of these prefixes:
+
+- `utm_`
+- `ref_`
+- `mtm_` and `pk_` (Matomo)
+- `hsa_` (HubSpot ads)
+- `_bta_` (Bronto)
+
+Remove these parameters when present:
+
+- `ref`
+- Google and Bing ads: `gclid`, `gclsrc`, `gbraid`, `wbraid`, `gad_source`, `gad_campaignid`, `dclid`, `srsltid`, `msclkid`, `_ga`, `_gl`
+- Social platforms: `fbclid`, `fb_action_ids`, `fb_ref`, `fb_source`, `igshid`, `igsh`, `ttclid`, `twclid`, `li_fat_id`, `yclid`
+- Email and marketing: `mc_cid`, `mc_eid`, `_hsenc`, `_hsmi`, `mkt_tok`, `oly_anon_id`, `oly_enc_id`, `vero_id`, `ml_subscriber`, `ml_subscriber_hash`, `elqTrackId`, `elqTrack`, `_openstat`, `vgo_ee`
+- Publishers and analytics: `smid`, `s_cid`, `sc_cid`, `cmpid`, `wickedid`, `spm`, `scm`
+- Affiliate and click IDs: `irclickid`, `rb_clickid`, `cjevent`, `_branch_match_id`, `click_id`, `clickid`
+
+Parameters that are not on these lists are kept, even when they look like noise. Site-specific rules handle the rest.
+
+#### Fragments
+
+- Remove a text fragment (`#:~:text=...`).
+- Remove tracking fragments: `#xtor=...` and a fragment that is itself a known tracking parameter, such as `#fbclid=...`.
+- Remove a bare trailing `#`.
+- Any other fragment is kept, because it may be an anchor or an in-page route.
+
+Example outcomes:
+
+- `https://example.com/?utm_source=x&keep=1` -> `https://example.com/?keep=1`
+- `https://www.google.com/url?q=https://example.com/a%3Futm_medium%3Dmail&sa=D` -> `https://example.com/a`
+- `https://example.com/page#:~:text=quoted%20words` -> `https://example.com/page`
+- `https://example.com/docs#install` -> `https://example.com/docs#install`
+- `https://t.co/AbC123` -> `https://t.co/AbC123`
 
 ### Site-specific URL rules
 
@@ -71,16 +118,17 @@ Current custom rules:
 
 - `x.com` links that are not article URLs are rewritten to `fxtwitter.com`.
 - `reddit.com` links are rewritten to `redlib.freedit.eu`.
-- `youtube.com` and `youtu.be` URLs remove all query parameters, then keep only `v` when that parameter exists.
+- `youtube.com` and `youtu.be` URLs remove all query parameters, then keep only `v` and `t` when those parameters exist. `v` is the video, `t` is the start time the sender chose, and both are part of what the link means.
 
 Example outcomes:
 
 - `https://example.com/?utm_source=x&keep=1` -> `https://example.com/?keep=1`
 - `https://x.com/user/status/42?utm_source=x` -> `https://fxtwitter.com/user/status/42`
-- `https://www.youtube.com/watch?v=abc123&utm_source=x&t=90` -> `https://www.youtube.com/watch?v=abc123`
+- `https://www.youtube.com/watch?v=abc123&utm_source=x&t=90` -> `https://www.youtube.com/watch?v=abc123&t=90`
 
 ### Plain-text cleanup
 
+If the text contains exactly one distinct HTTP(S) URL, extract and clean that instead of treating it as plain text.
 If the clipboard text is not an `http` or `https` URL:
 
 - replace line breaks with spaces
