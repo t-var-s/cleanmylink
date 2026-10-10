@@ -4,7 +4,7 @@ Clean My Link is a mobile-first web app and installable PWA for iOS, Android, an
 
 The app is intentionally single-purpose:
 
-- one primary text box and action button
+- one primary action button
 - one live status message
 - one local recent-links list
 - no accounts, sync, or server-side state
@@ -13,33 +13,25 @@ The app is intentionally single-purpose:
 
 Default UI copy:
 
-- Status: `Remove junk parameters from any URL you paste, type or drop in.`
-- Button: `Paste`
+- Status: `Remove junk parameters from any URL you page or drop in.`
+- Button: `Click to paste a link here`
 
-When the user taps the action button that starts by saying `Paste`:
+When the user taps the button:
 
 1. The app shows `Accessing Clipboard`.
 2. It reads the current clipboard text.
 3. It cleans the value as either a URL or plain text.
 4. It writes the cleaned result back to the clipboard.
 5. It updates the status message.
-6. Alongside the steps above, the text box shows the process as the text being transformed.
-7. After a successful transformation, the text box clears, unfocuses and the button also resets.
-
-If writing to the clipboard fails, the button can also appear as `Copy`.
-
-The user can also tap the text box. If they paste there, the text box reacts and follows a similar process.
-If they type any amount of text in, the `Paste` button changes to `Clean` and tapping that transforms
-the text currently typed.
-On desktop, the user can also globally use the standard keybinding to paste at anytime.
-They can also drag and drop text into the page.
 
 Status outcomes:
 
 - Empty clipboard: `No text was found in your clipboard.`
+- Successful clean: `All clear!`
+- Unchanged but valid input: `All clear!`
 - Clipboard permission denied: `Clipboard access is blocked. Try allowing clipboard permissions.`
 - Unexpected failure: `Something went sideways while cleaning your clipboard.`
-- Successful transformation: `All clear!`
+- If writing to clipboard fails, a Copy button appears.
 
 ## Clipboard transformation rules
 
@@ -120,7 +112,6 @@ Ordering rules:
 
 - Mobile-first presentation is the default.
 - On small screens, the hero panel stays fixed near the bottom and the history list scrolls behind it.
-- Also on small screens, expecting the keyboard that comes up, the hero panel expands and stays with the keyboard covering the history behind. 
 - At `960px` and above, the app switches to a two-column desktop layout with history on the left and the primary action panel on the right.
 - The settings shortcut sits in the top-right corner on mobile and in the bottom-right corner on desktop.
 - The design uses a restrained dark palette with a cool blue accent and a subtle grid background.
